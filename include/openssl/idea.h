@@ -64,7 +64,8 @@
 #  error IDEA is disabled.
 # endif
 
-typedef unsigned int IDEA_INT;
+//typedef unsigned int IDEA_INT;
+#define IDEA_INT unsigned int
 
 # define IDEA_ENCRYPT    1
 # define IDEA_DECRYPT    0

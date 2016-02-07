@@ -58,7 +58,7 @@
 #include "internal/cryptlib.h"
 
 #ifndef NO_WINDOWS_BRAINDEATH
-# include "buildinf.h"
+//# include "buildinf.h"
 #endif
 
 unsigned long OpenSSL_version_num(void)

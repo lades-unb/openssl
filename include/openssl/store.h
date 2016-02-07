@@ -61,6 +61,7 @@
 
 # include <openssl/opensslconf.h>
 
+#undef OPENSSL_NO_STORE
 # ifdef OPENSSL_NO_STORE
 #  error STORE is disabled.
 # endif

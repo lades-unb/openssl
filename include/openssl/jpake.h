@@ -10,6 +10,7 @@
 
 # include <openssl/opensslconf.h>
 
+# undef OPENSSL_NO_JPAKE
 # ifdef OPENSSL_NO_JPAKE
 #  error JPAKE is disabled.
 # endif

@@ -91,6 +91,9 @@ extern "C" {
 # define OCSP_TRUSTOTHER                 0x200
 # define OCSP_RESPID_KEY                 0x400
 # define OCSP_NOTIME                     0x800
+# undef OCSP_REQUEST
+# undef X509_NAME
+# undef OCSP_RESPONSE
 
 typedef struct ocsp_cert_id_st OCSP_CERTID;
 

@@ -213,7 +213,7 @@ void *DH_get_ex_data(DH *d, int idx);
 DEPRECATEDIN_0_9_8(DH *DH_generate_parameters(int prime_len, int generator,
                                               void (*callback) (int, int,
                                                                 void *),
-                                              void *cb_arg))
+                                              void *cb_arg));
 
 /* New version */
 int DH_generate_parameters_ex(DH *dh, int prime_len, int generator,

@@ -358,7 +358,7 @@ void ERR_load_crypto_strings(void);
 void ERR_free_strings(void);
 
 void ERR_remove_thread_state(const CRYPTO_THREADID *tid);
-DEPRECATEDIN_1_0_0(void ERR_remove_state(unsigned long pid)) /* if zero we
+DEPRECATEDIN_1_0_0(void ERR_remove_state(unsigned long pid)); /* if zero we
                                                               * look it up */
 ERR_STATE *ERR_get_state(void);
 

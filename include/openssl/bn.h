@@ -378,16 +378,16 @@ DEPRECATEDIN_0_9_8(BIGNUM *BN_generate_prime(BIGNUM *ret, int bits, int safe,
                                              const BIGNUM *rem,
                                              void (*callback) (int, int,
                                                                void *),
-                                             void *cb_arg))
+                                             void *cb_arg));
 DEPRECATEDIN_0_9_8(int
                    BN_is_prime(const BIGNUM *p, int nchecks,
                                void (*callback) (int, int, void *),
-                               BN_CTX *ctx, void *cb_arg))
+                               BN_CTX *ctx, void *cb_arg));
 DEPRECATEDIN_0_9_8(int
                    BN_is_prime_fasttest(const BIGNUM *p, int nchecks,
                                         void (*callback) (int, int, void *),
                                         BN_CTX *ctx, void *cb_arg,
-                                        int do_trial_division))
+                                        int do_trial_division));
 
 /* Newer versions */
 int BN_generate_prime_ex(BIGNUM *ret, int bits, int safe, const BIGNUM *add,
@@ -432,9 +432,9 @@ int BN_BLINDING_convert_ex(BIGNUM *n, BIGNUM *r, BN_BLINDING *b, BN_CTX *);
 int BN_BLINDING_invert_ex(BIGNUM *n, const BIGNUM *r, BN_BLINDING *b,
                           BN_CTX *);
 DEPRECATEDIN_1_0_0(unsigned long
-                   BN_BLINDING_get_thread_id(const BN_BLINDING *))
+                   BN_BLINDING_get_thread_id(const BN_BLINDING *));
 DEPRECATEDIN_1_0_0(void
-                   BN_BLINDING_set_thread_id(BN_BLINDING *, unsigned long))
+                   BN_BLINDING_set_thread_id(BN_BLINDING *, unsigned long));
 CRYPTO_THREADID *BN_BLINDING_thread_id(BN_BLINDING *);
 unsigned long BN_BLINDING_get_flags(const BN_BLINDING *);
 void BN_BLINDING_set_flags(BN_BLINDING *, unsigned long);
@@ -448,8 +448,8 @@ BN_BLINDING *BN_BLINDING_create_param(BN_BLINDING *b,
                                                          BN_MONT_CTX *m_ctx),
                                       BN_MONT_CTX *m_ctx);
 
-DEPRECATEDIN_0_9_8(void BN_set_params(int mul, int high, int low, int mont))
-DEPRECATEDIN_0_9_8(int BN_get_params(int which)) /* 0, mul, 1 high, 2 low, 3
+DEPRECATEDIN_0_9_8(void BN_set_params(int mul, int high, int low, int mont));
+DEPRECATEDIN_0_9_8(int BN_get_params(int which)); /* 0, mul, 1 high, 2 low, 3
                                                   * mont */
 
 BN_RECP_CTX *BN_RECP_CTX_new(void);

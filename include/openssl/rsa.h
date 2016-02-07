@@ -318,7 +318,7 @@ int RSA_security_bits(const RSA *rsa);
 /* Deprecated version */
 DEPRECATEDIN_0_9_8(RSA *RSA_generate_key(int bits, unsigned long e, void
                                          (*callback) (int, int, void *),
-                                         void *cb_arg))
+                                         void *cb_arg));
 
 /* New version */
 int RSA_generate_key_ex(RSA *rsa, int bits, BIGNUM *e, BN_GENCB *cb);

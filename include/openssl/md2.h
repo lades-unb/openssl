@@ -59,12 +59,14 @@
 # define HEADER_MD2_H
 
 # include <openssl/opensslconf.h>
+# undef OPENSSL_NO_MD2
 # ifdef OPENSSL_NO_MD2
 #  error MD2 is disabled.
 # endif
 # include <stddef.h>
 
-typedef unsigned char MD2_INT;
+//typedef unsigned char MD2_INT;
+#define MD2_INT unsigned char
 
 # define MD2_DIGEST_LENGTH       16
 # define MD2_BLOCK               16

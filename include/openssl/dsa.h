@@ -229,7 +229,7 @@ DEPRECATEDIN_0_9_8(DSA *DSA_generate_parameters(int bits,
                                                 unsigned long *h_ret, void
                                                  (*callback) (int, int,
                                                               void *),
-                                                void *cb_arg))
+                                                void *cb_arg));
 
 /* New version */
 int DSA_generate_parameters_ex(DSA *dsa, int bits,
