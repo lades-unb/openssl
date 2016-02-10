@@ -1,3 +1,4 @@
+/* bio_ndef.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
@@ -105,14 +106,14 @@ BIO *BIO_new_NDEF(BIO *out, ASN1_VALUE *val, const ASN1_ITEM *it)
         ASN1err(ASN1_F_BIO_NEW_NDEF, ASN1_R_STREAMING_NOT_SUPPORTED);
         return NULL;
     }
-    ndef_aux = OPENSSL_malloc(sizeof(*ndef_aux));
+    ndef_aux = OPENSSL_malloc(sizeof(NDEF_SUPPORT));
     asn_bio = BIO_new(BIO_f_asn1());
 
     /* ASN1 bio needs to be next to output BIO */
 
     out = BIO_push(asn_bio, out);
 
-    if (ndef_aux == NULL || asn_bio == NULL || !out)
+    if (!ndef_aux || !asn_bio || !out)
         goto err;
 
     BIO_asn1_set_prefix(asn_bio, ndef_prefix, ndef_prefix_free);
@@ -141,8 +142,10 @@ BIO *BIO_new_NDEF(BIO *out, ASN1_VALUE *val, const ASN1_ITEM *it)
     return sarg.ndef_bio;
 
  err:
-    BIO_free(asn_bio);
-    OPENSSL_free(ndef_aux);
+    if (asn_bio)
+        BIO_free(asn_bio);
+    if (ndef_aux)
+        OPENSSL_free(ndef_aux);
     return NULL;
 }
 
@@ -159,7 +162,7 @@ static int ndef_prefix(BIO *b, unsigned char **pbuf, int *plen, void *parg)
 
     derlen = ASN1_item_ndef_i2d(ndef_aux->val, NULL, ndef_aux->it);
     p = OPENSSL_malloc(derlen);
-    if (p == NULL)
+    if (!p)
         return 0;
 
     ndef_aux->derbuf = p;
@@ -184,7 +187,8 @@ static int ndef_prefix_free(BIO *b, unsigned char **pbuf, int *plen,
 
     ndef_aux = *(NDEF_SUPPORT **)parg;
 
-    OPENSSL_free(ndef_aux->derbuf);
+    if (ndef_aux->derbuf)
+        OPENSSL_free(ndef_aux->derbuf);
 
     ndef_aux->derbuf = NULL;
     *pbuf = NULL;
@@ -228,7 +232,7 @@ static int ndef_suffix(BIO *b, unsigned char **pbuf, int *plen, void *parg)
 
     derlen = ASN1_item_ndef_i2d(ndef_aux->val, NULL, ndef_aux->it);
     p = OPENSSL_malloc(derlen);
-    if (p == NULL)
+    if (!p)
         return 0;
 
     ndef_aux->derbuf = p;

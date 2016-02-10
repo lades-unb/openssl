@@ -1,3 +1,4 @@
+/* rsa_null.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/bn.h>
 #include <openssl/rsa.h>
 #include <openssl/rand.h>
@@ -78,6 +79,9 @@ static int RSA_null_public_decrypt(int flen, const unsigned char *from,
                                    unsigned char *to, RSA *rsa, int padding);
 static int RSA_null_private_decrypt(int flen, const unsigned char *from,
                                     unsigned char *to, RSA *rsa, int padding);
+#if 0                           /* not currently used */
+static int RSA_null_mod_exp(const BIGNUM *r0, const BIGNUM *i, RSA *rsa);
+#endif
 static int RSA_null_init(RSA *rsa);
 static int RSA_null_finish(RSA *rsa);
 static RSA_METHOD rsa_null_meth = {
@@ -131,6 +135,14 @@ static int RSA_null_public_decrypt(int flen, const unsigned char *from,
     RSAerr(RSA_F_RSA_NULL_PUBLIC_DECRYPT, RSA_R_RSA_OPERATIONS_NOT_SUPPORTED);
     return -1;
 }
+
+#if 0                           /* not currently used */
+static int RSA_null_mod_exp(BIGNUM *r0, BIGNUM *I, RSA *rsa)
+{
+    ... err(RSA_F_RSA_NULL_MOD_EXP, RSA_R_RSA_OPERATIONS_NOT_SUPPORTED);
+    return -1;
+}
+#endif
 
 static int RSA_null_init(RSA *rsa)
 {

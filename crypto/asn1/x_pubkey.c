@@ -1,3 +1,4 @@
+/* crypto/asn1/x_pubkey.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,11 +57,10 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/asn1t.h>
 #include <openssl/x509.h>
-#include "internal/asn1_int.h"
-#include "internal/evp_int.h"
+#include "asn1_locl.h"
 #ifndef OPENSSL_NO_RSA
 # include <openssl/rsa.h>
 #endif
@@ -112,45 +112,50 @@ int X509_PUBKEY_set(X509_PUBKEY **x, EVP_PKEY *pkey)
         goto error;
     }
 
-    X509_PUBKEY_free(*x);
-    *x = pk;
-    return 1;
+    if (*x != NULL)
+        X509_PUBKEY_free(*x);
 
+    *x = pk;
+
+    return 1;
  error:
-    X509_PUBKEY_free(pk);
+    if (pk != NULL)
+        X509_PUBKEY_free(pk);
     return 0;
 }
 
-EVP_PKEY *X509_PUBKEY_get0(X509_PUBKEY *key)
+EVP_PKEY *X509_PUBKEY_get(X509_PUBKEY *key)
 {
     EVP_PKEY *ret = NULL;
 
     if (key == NULL)
         goto error;
 
-    if (key->pkey != NULL)
+    if (key->pkey != NULL) {
+        CRYPTO_add(&key->pkey->references, 1, CRYPTO_LOCK_EVP_PKEY);
         return key->pkey;
+    }
 
     if (key->public_key == NULL)
         goto error;
 
     if ((ret = EVP_PKEY_new()) == NULL) {
-        X509err(X509_F_X509_PUBKEY_GET0, ERR_R_MALLOC_FAILURE);
+        X509err(X509_F_X509_PUBKEY_GET, ERR_R_MALLOC_FAILURE);
         goto error;
     }
 
     if (!EVP_PKEY_set_type(ret, OBJ_obj2nid(key->algor->algorithm))) {
-        X509err(X509_F_X509_PUBKEY_GET0, X509_R_UNSUPPORTED_ALGORITHM);
+        X509err(X509_F_X509_PUBKEY_GET, X509_R_UNSUPPORTED_ALGORITHM);
         goto error;
     }
 
     if (ret->ameth->pub_decode) {
         if (!ret->ameth->pub_decode(ret, key)) {
-            X509err(X509_F_X509_PUBKEY_GET0, X509_R_PUBLIC_KEY_DECODE_ERROR);
+            X509err(X509_F_X509_PUBKEY_GET, X509_R_PUBLIC_KEY_DECODE_ERROR);
             goto error;
         }
     } else {
-        X509err(X509_F_X509_PUBKEY_GET0, X509_R_METHOD_NOT_SUPPORTED);
+        X509err(X509_F_X509_PUBKEY_GET, X509_R_METHOD_NOT_SUPPORTED);
         goto error;
     }
 
@@ -164,20 +169,14 @@ EVP_PKEY *X509_PUBKEY_get0(X509_PUBKEY *key)
         key->pkey = ret;
         CRYPTO_w_unlock(CRYPTO_LOCK_EVP_PKEY);
     }
+    CRYPTO_add(&ret->references, 1, CRYPTO_LOCK_EVP_PKEY);
 
     return ret;
 
  error:
-    EVP_PKEY_free(ret);
-    return (NULL);
-}
-
-EVP_PKEY *X509_PUBKEY_get(X509_PUBKEY *key)
-{
-    EVP_PKEY *ret = X509_PUBKEY_get0(key);
     if (ret != NULL)
-        EVP_PKEY_up_ref(ret);
-    return ret;
+        EVP_PKEY_free(ret);
+    return (NULL);
 }
 
 /*
@@ -189,16 +188,13 @@ EVP_PKEY *d2i_PUBKEY(EVP_PKEY **a, const unsigned char **pp, long length)
 {
     X509_PUBKEY *xpk;
     EVP_PKEY *pktmp;
-    const unsigned char *q;
-    q = *pp;
-    xpk = d2i_X509_PUBKEY(NULL, &q, length);
+    xpk = d2i_X509_PUBKEY(NULL, pp, length);
     if (!xpk)
         return NULL;
     pktmp = X509_PUBKEY_get(xpk);
     X509_PUBKEY_free(xpk);
     if (!pktmp)
         return NULL;
-    *pp = q;
     if (a) {
         EVP_PKEY_free(*a);
         *a = pktmp;
@@ -251,7 +247,7 @@ int i2d_RSA_PUBKEY(RSA *a, unsigned char **pp)
     if (!a)
         return 0;
     pktmp = EVP_PKEY_new();
-    if (pktmp == NULL) {
+    if (!pktmp) {
         ASN1err(ASN1_F_I2D_RSA_PUBKEY, ERR_R_MALLOC_FAILURE);
         return 0;
     }
@@ -291,7 +287,7 @@ int i2d_DSA_PUBKEY(DSA *a, unsigned char **pp)
     if (!a)
         return 0;
     pktmp = EVP_PKEY_new();
-    if (pktmp == NULL) {
+    if (!pktmp) {
         ASN1err(ASN1_F_I2D_DSA_PUBKEY, ERR_R_MALLOC_FAILURE);
         return 0;
     }
@@ -348,7 +344,8 @@ int X509_PUBKEY_set0_param(X509_PUBKEY *pub, ASN1_OBJECT *aobj,
     if (!X509_ALGOR_set0(pub->algor, aobj, ptype, pval))
         return 0;
     if (penc) {
-        OPENSSL_free(pub->public_key->data);
+        if (pub->public_key->data)
+            OPENSSL_free(pub->public_key->data);
         pub->public_key->data = penc;
         pub->public_key->length = penclen;
         /* Set number of unused bits to zero */

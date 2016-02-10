@@ -1,3 +1,4 @@
+/* v3_pku.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,11 +58,10 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/x509v3.h>
-#include "ext_dat.h"
 
 static int i2r_PKEY_USAGE_PERIOD(X509V3_EXT_METHOD *method,
                                  PKEY_USAGE_PERIOD *usage, BIO *out,

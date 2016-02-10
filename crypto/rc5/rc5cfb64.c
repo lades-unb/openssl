@@ -1,3 +1,4 @@
+/* crypto/rc5/rc5cfb64.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -55,7 +56,7 @@
  * [including the GNU Public Licence.]
  */
 
-#include <openssl/rc5.h>
+#include "rc5.h" 
 #include "rc5_locl.h"
 
 /*

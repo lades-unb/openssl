@@ -1,3 +1,4 @@
+/* crypto/bio/bio_lib.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -58,14 +59,15 @@
 #include <stdio.h>
 #include <errno.h>
 #include <openssl/crypto.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/bio.h>
 #include <openssl/stack.h>
 
 BIO *BIO_new(BIO_METHOD *method)
 {
-    BIO *ret = OPENSSL_malloc(sizeof(*ret));
+    BIO *ret = NULL;
 
+    ret = (BIO *)OPENSSL_malloc(sizeof(BIO));
     if (ret == NULL) {
         BIOerr(BIO_F_BIO_NEW, ERR_R_MALLOC_FAILURE);
         return (NULL);
@@ -208,7 +210,7 @@ int BIO_read(BIO *b, void *out, int outl)
     i = b->method->bread(b, out, outl);
 
     if (i > 0)
-        b->num_read += (uint64_t)i;
+        b->num_read += (unsigned long)i;
 
     if (cb != NULL)
         i = (int)cb(b, BIO_CB_READ | BIO_CB_RETURN, out, outl, 0L, (long)i);
@@ -241,7 +243,7 @@ int BIO_write(BIO *b, const void *in, int inl)
     i = b->method->bwrite(b, in, inl);
 
     if (i > 0)
-        b->num_write += (uint64_t)i;
+        b->num_write += (unsigned long)i;
 
     if (cb != NULL)
         i = (int)cb(b, BIO_CB_WRITE | BIO_CB_RETURN, in, inl, 0L, (long)i);
@@ -271,7 +273,7 @@ int BIO_puts(BIO *b, const char *in)
     i = b->method->bputs(b, in);
 
     if (i > 0)
-        b->num_write += (uint64_t)i;
+        b->num_write += (unsigned long)i;
 
     if (cb != NULL)
         i = (int)cb(b, BIO_CB_PUTS | BIO_CB_RETURN, in, 0, 0L, (long)i);
@@ -325,9 +327,9 @@ long BIO_int_ctrl(BIO *b, int cmd, long larg, int iarg)
     return (BIO_ctrl(b, cmd, larg, (char *)&i));
 }
 
-void *BIO_ptr_ctrl(BIO *b, int cmd, long larg)
+char *BIO_ptr_ctrl(BIO *b, int cmd, long larg)
 {
-    void *p = NULL;
+    char *p = NULL;
 
     if (BIO_ctrl(b, cmd, larg, (char *)&p) <= 0)
         return (NULL);
@@ -470,7 +472,7 @@ BIO *BIO_find_type(BIO *bio, int type)
 {
     int mt, mask;
 
-    if (bio == NULL)
+    if (!bio)
         return NULL;
     mask = type & 0xff;
     do {
@@ -490,7 +492,7 @@ BIO *BIO_find_type(BIO *bio, int type)
 
 BIO *BIO_next(BIO *b)
 {
-    if (b == NULL)
+    if (!b)
         return NULL;
     return b->next_bio;
 }
@@ -560,6 +562,13 @@ void BIO_copy_next_retry(BIO *b)
     b->retry_reason = b->next_bio->retry_reason;
 }
 
+int BIO_get_ex_new_index(long argl, void *argp, CRYPTO_EX_new *new_func,
+                         CRYPTO_EX_dup *dup_func, CRYPTO_EX_free *free_func)
+{
+    return CRYPTO_get_ex_new_index(CRYPTO_EX_INDEX_BIO, argl, argp,
+                                   new_func, dup_func, free_func);
+}
+
 int BIO_set_ex_data(BIO *bio, int idx, void *data)
 {
     return (CRYPTO_set_ex_data(&(bio->ex_data), idx, data));
@@ -570,16 +579,18 @@ void *BIO_get_ex_data(BIO *bio, int idx)
     return (CRYPTO_get_ex_data(&(bio->ex_data), idx));
 }
 
-uint64_t BIO_number_read(BIO *bio)
+unsigned long BIO_number_read(BIO *bio)
 {
     if (bio)
         return bio->num_read;
     return 0;
 }
 
-uint64_t BIO_number_written(BIO *bio)
+unsigned long BIO_number_written(BIO *bio)
 {
     if (bio)
         return bio->num_write;
     return 0;
 }
+
+IMPLEMENT_STACK_OF(BIO)

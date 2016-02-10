@@ -1,3 +1,4 @@
+/* pmeth_gn.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 2006.
@@ -58,11 +59,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/objects.h>
 #include <openssl/evp.h>
-#include "internal/bn_int.h"
-#include "internal/evp_int.h"
+#include <openssl/bn.h>
+#include "evp_locl.h"
 
 int EVP_PKEY_paramgen_init(EVP_PKEY_CTX *ctx)
 {
@@ -95,16 +96,11 @@ int EVP_PKEY_paramgen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey)
         return -1;
     }
 
-    if (ppkey == NULL)
+    if (!ppkey)
         return -1;
 
-    if (*ppkey == NULL)
+    if (!*ppkey)
         *ppkey = EVP_PKEY_new();
-
-    if (*ppkey == NULL) {
-        EVPerr(EVP_F_EVP_PKEY_PARAMGEN, ERR_R_MALLOC_FAILURE);
-        return -1;
-    }
 
     ret = ctx->pmeth->paramgen(ctx, *ppkey);
     if (ret <= 0) {
@@ -145,13 +141,11 @@ int EVP_PKEY_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey)
         return -1;
     }
 
-    if (ppkey == NULL)
+    if (!ppkey)
         return -1;
 
-    if (*ppkey == NULL)
+    if (!*ppkey)
         *ppkey = EVP_PKEY_new();
-    if (*ppkey == NULL)
-        return -1;
 
     ret = ctx->pmeth->keygen(ctx, *ppkey);
     if (ret <= 0) {
@@ -178,7 +172,7 @@ EVP_PKEY_gen_cb *EVP_PKEY_CTX_get_cb(EVP_PKEY_CTX *ctx)
 
 static int trans_cb(int a, int b, BN_GENCB *gcb)
 {
-    EVP_PKEY_CTX *ctx = BN_GENCB_get_arg(gcb);
+    EVP_PKEY_CTX *ctx = gcb->arg;
     ctx->keygen_info[0] = a;
     ctx->keygen_info[1] = b;
     return ctx->pkey_gencb(ctx);
@@ -186,7 +180,7 @@ static int trans_cb(int a, int b, BN_GENCB *gcb)
 
 void evp_pkey_set_cb_translate(BN_GENCB *cb, EVP_PKEY_CTX *ctx)
 {
-    BN_GENCB_set(cb, trans_cb, ctx);
+    BN_GENCB_set(cb, trans_cb, ctx)
 }
 
 int EVP_PKEY_CTX_get_keygen_info(EVP_PKEY_CTX *ctx, int idx)
@@ -208,11 +202,14 @@ EVP_PKEY *EVP_PKEY_new_mac_key(int type, ENGINE *e,
         return NULL;
     if (EVP_PKEY_keygen_init(mac_ctx) <= 0)
         goto merr;
-    if (EVP_PKEY_CTX_set_mac_key(mac_ctx, key, keylen) <= 0)
+    if (EVP_PKEY_CTX_ctrl(mac_ctx, -1, EVP_PKEY_OP_KEYGEN,
+                          EVP_PKEY_CTRL_SET_MAC_KEY,
+                          keylen, (void *)key) <= 0)
         goto merr;
     if (EVP_PKEY_keygen(mac_ctx, &mac_key) <= 0)
         goto merr;
  merr:
-    EVP_PKEY_CTX_free(mac_ctx);
+    if (mac_ctx)
+        EVP_PKEY_CTX_free(mac_ctx);
     return mac_key;
 }

@@ -1,3 +1,0 @@
-LIBS=../../libcrypto
-SOURCE[../../libcrypto]=\
-        {- $target{rc4_asm_src} -}

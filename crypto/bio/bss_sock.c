@@ -1,3 +1,4 @@
+/* crypto/bio/bss_sock.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -58,7 +59,7 @@
 #include <stdio.h>
 #include <errno.h>
 #define USE_SOCKETS
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 
 #ifndef OPENSSL_NO_SOCK
 
@@ -231,6 +232,12 @@ int BIO_sock_non_fatal_error(int err)
 # if defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_NETWARE)
 #  if defined(WSAEWOULDBLOCK)
     case WSAEWOULDBLOCK:
+#  endif
+
+#  if 0                         /* This appears to always be an error */
+#   if defined(WSAENOTCONN)
+    case WSAENOTCONN:
+#   endif
 #  endif
 # endif
 

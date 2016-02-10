@@ -1,3 +1,4 @@
+/* crypto/cms/cms_att.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
@@ -55,7 +56,7 @@
 #include <openssl/pem.h>
 #include <openssl/x509v3.h>
 #include <openssl/err.h>
-#include <openssl/cms.h>
+#include "cms.h"
 #include "cms_lcl.h"
 
 /* CMS SignedData Attribute utilities */

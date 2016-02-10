@@ -64,7 +64,6 @@
 # Ivy Bridge	1.80(+7%)
 # Haswell	0.55(+93%) (if system doesn't support AVX)
 # Broadwell	0.45(+110%)(if system doesn't support AVX)
-# Skylake	0.44(+110%)(if system doesn't support AVX)
 # Bulldozer	1.49(+27%)
 # Silvermont	2.88(+13%)
 
@@ -75,8 +74,8 @@
 # CPUs such as Sandy and Ivy Bridge can execute it, the code performs
 # sub-optimally in comparison to above mentioned version. But thanks
 # to Ilya Albrekht and Max Locktyukhin of Intel Corp. we knew that
-# it performs in 0.41 cycles per byte on Haswell processor, in
-# 0.29 on Broadwell, and in 0.36 on Skylake.
+# it performs in 0.41 cycles per byte on Haswell processor, and in
+# 0.29 on Broadwell.
 #
 # [1] http://rt.openssl.org/Ticket/Display.html?id=2900&user=guest&pass=guest
 
@@ -106,7 +105,7 @@ if (!$avx && $win64 && ($flavour =~ /masm/ || $ENV{ASM} =~ /ml64/) &&
 	$avx = ($1>=10) + ($1>=11);
 }
 
-if (!$avx && `$ENV{CC} -v 2>&1` =~ /((?:^clang|LLVM) version|.*based on LLVM) ([3-9]\.[0-9]+)/) {
+if (!$avx && `$ENV{CC} -v 2>&1` =~ /(^clang version|based on LLVM) ([3-9]\.[0-9]+)/) {
 	$avx = ($2>=3.0) + ($2>3.0);
 }
 
@@ -577,15 +576,15 @@ $code.=<<___ if (0 || (&reduction_alg9($Xhi,$Xi)&&0));
 	# experimental alternative. special thing about is that there
 	# no dependency between the two multiplications... 
 	mov		\$`0xE1<<1`,%eax
-	mov		\$0xA040608020C0E000,%r10	# ((7..0)Â·0xE0)&0xff
+	mov		\$0xA040608020C0E000,%r10	# ((7..0)·0xE0)&0xff
 	mov		\$0x07,%r11d
 	movq		%rax,$T1
 	movq		%r10,$T2
 	movq		%r11,$T3		# borrow $T3
 	pand		$Xi,$T3
-	pshufb		$T3,$T2			# ($Xi&7)Â·0xE0
+	pshufb		$T3,$T2			# ($Xi&7)·0xE0
 	movq		%rax,$T3
-	pclmulqdq	\$0x00,$Xi,$T1		# Â·(0xE1<<1)
+	pclmulqdq	\$0x00,$Xi,$T1		# ·(0xE1<<1)
 	pxor		$Xi,$T2
 	pslldq		\$15,$T2
 	paddd		$T2,$T2			# <<(64+56+1)
@@ -658,7 +657,7 @@ $code.=<<___;
 	je		.Lskip4x
 
 	sub		\$0x30,$len
-	mov		\$0xA040608020C0E000,%rax	# ((7..0)Â·0xE0)&0xff
+	mov		\$0xA040608020C0E000,%rax	# ((7..0)·0xE0)&0xff
 	movdqu		0x30($Htbl),$Hkey3
 	movdqu		0x40($Htbl),$Hkey4
 

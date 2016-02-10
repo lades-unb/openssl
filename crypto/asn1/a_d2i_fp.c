@@ -1,3 +1,4 @@
+/* crypto/asn1/a_d2i_fp.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -57,14 +58,14 @@
 
 #include <stdio.h>
 #include <limits.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/buffer.h>
-#include <openssl/asn1.h>
+#include <openssl/asn1_mac.h>
 
 static int asn1_d2i_read_bio(BIO *in, BUF_MEM **pb);
 
 #ifndef NO_OLD_ASN1
-# ifndef OPENSSL_NO_STDIO
+# ifndef OPENSSL_NO_FP_API
 
 void *ASN1_d2i_fp(void *(*xnew) (void), d2i_of_void *d2i, FILE *in, void **x)
 {
@@ -96,7 +97,8 @@ void *ASN1_d2i_bio(void *(*xnew) (void), d2i_of_void *d2i, BIO *in, void **x)
     p = (unsigned char *)b->data;
     ret = d2i(x, &p, len);
  err:
-    BUF_MEM_free(b);
+    if (b != NULL)
+        BUF_MEM_free(b);
     return (ret);
 }
 
@@ -113,14 +115,21 @@ void *ASN1_item_d2i_bio(const ASN1_ITEM *it, BIO *in, void *x)
     if (len < 0)
         goto err;
 
+	//printf("Will print ASN1 contents in ASN1_item_d2i_bio():\n\n");
+	//int i;
+	//for (i = 0; i < len; i++) printf("%c", b->data[i]);
+
+	//printf("\n\nFinished printing ASN1 contents.\n\n");
+
     p = (const unsigned char *)b->data;
     ret = ASN1_item_d2i(x, &p, len, it);
  err:
-    BUF_MEM_free(b);
+    if (b != NULL)
+        BUF_MEM_free(b);
     return (ret);
 }
 
-#ifndef OPENSSL_NO_STDIO
+#ifndef OPENSSL_NO_FP_API
 void *ASN1_item_d2i_fp(const ASN1_ITEM *it, FILE *in, void *x)
 {
     BIO *b;
@@ -143,14 +152,11 @@ static int asn1_d2i_read_bio(BIO *in, BUF_MEM **pb)
     BUF_MEM *b;
     unsigned char *p;
     int i;
+    ASN1_const_CTX c;
     size_t want = HEADER_SIZE;
     int eos = 0;
     size_t off = 0;
     size_t len = 0;
-
-    const unsigned char *q;
-    long slen;
-    int inf, tag, xclass;
 
     b = BUF_MEM_new();
     if (b == NULL) {
@@ -183,9 +189,10 @@ static int asn1_d2i_read_bio(BIO *in, BUF_MEM **pb)
         /* else data already loaded */
 
         p = (unsigned char *)&(b->data[off]);
-        q = p;
-        inf = ASN1_get_object(&q, &slen, &tag, &xclass, len - off);
-        if (inf & 0x80) {
+        c.p = p;
+        c.inf = ASN1_get_object(&(c.p), &(c.slen), &(c.tag), &(c.xclass),
+                                len - off);
+        if (c.inf & 0x80) {
             unsigned long e;
 
             e = ERR_GET_REASON(ERR_peek_error());
@@ -194,10 +201,10 @@ static int asn1_d2i_read_bio(BIO *in, BUF_MEM **pb)
             else
                 ERR_clear_error(); /* clear error */
         }
-        i = q - p;            /* header length */
+        i = c.p - p;            /* header length */
         off += i;               /* end of data */
 
-        if (inf & 1) {
+        if (c.inf & 1) {
             /* no data body so go round again */
             eos++;
             if (eos < 0) {
@@ -205,7 +212,7 @@ static int asn1_d2i_read_bio(BIO *in, BUF_MEM **pb)
                 goto err;
             }
             want = HEADER_SIZE;
-        } else if (eos && (slen == 0) && (tag == V_ASN1_EOC)) {
+        } else if (eos && (c.slen == 0) && (c.tag == V_ASN1_EOC)) {
             /* eos value, so go back and read another header */
             eos--;
             if (eos <= 0)
@@ -213,8 +220,8 @@ static int asn1_d2i_read_bio(BIO *in, BUF_MEM **pb)
             else
                 want = HEADER_SIZE;
         } else {
-            /* suck in slen bytes of data */
-            want = slen;
+            /* suck in c.slen bytes of data */
+            want = c.slen;
             if (want > (len - off)) {
                 want -= (len - off);
                 if (want > INT_MAX /* BIO_read takes an int length */  ||
@@ -241,11 +248,11 @@ static int asn1_d2i_read_bio(BIO *in, BUF_MEM **pb)
                     want -= i;
                 }
             }
-            if (off + slen < off) {
+            if (off + c.slen < off) {
                 ASN1err(ASN1_F_ASN1_D2I_READ_BIO, ASN1_R_TOO_LONG);
                 goto err;
             }
-            off += slen;
+            off += c.slen;
             if (eos <= 0) {
                 break;
             } else
@@ -261,6 +268,7 @@ static int asn1_d2i_read_bio(BIO *in, BUF_MEM **pb)
     *pb = b;
     return off;
  err:
-    BUF_MEM_free(b);
+    if (b != NULL)
+        BUF_MEM_free(b);
     return -1;
 }

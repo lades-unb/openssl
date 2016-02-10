@@ -1,3 +1,4 @@
+/* crypto/bn/bn_ctx.c */
 /* Written by Ulf Moeller for the OpenSSL project. */
 /* ====================================================================
  * Copyright (c) 1998-2004 The OpenSSL Project.  All rights reserved.
@@ -59,9 +60,10 @@
 # endif
 #endif
 
+#include <stdio.h>
 #include <assert.h>
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include "bn_lcl.h"
 
 /*-
@@ -102,7 +104,10 @@ typedef struct bignum_pool {
 } BN_POOL;
 static void BN_POOL_init(BN_POOL *);
 static void BN_POOL_finish(BN_POOL *);
-static BIGNUM *BN_POOL_get(BN_POOL *, int);
+#ifndef OPENSSL_NO_DEPRECATED
+static void BN_POOL_reset(BN_POOL *);
+#endif
+static BIGNUM *BN_POOL_get(BN_POOL *);
 static void BN_POOL_release(BN_POOL *, unsigned int);
 
 /************/
@@ -118,6 +123,9 @@ typedef struct bignum_ctx_stack {
 } BN_STACK;
 static void BN_STACK_init(BN_STACK *);
 static void BN_STACK_finish(BN_STACK *);
+#ifndef OPENSSL_NO_DEPRECATED
+static void BN_STACK_reset(BN_STACK *);
+#endif
 static int BN_STACK_push(BN_STACK *, unsigned int);
 static unsigned int BN_STACK_pop(BN_STACK *);
 
@@ -137,8 +145,6 @@ struct bignum_ctx {
     int err_stack;
     /* Block "gets" until an "end" (compatibility behaviour) */
     int too_many;
-    /* Flags. */
-    int flags;
 };
 
 /* Enable this to find BN_CTX bugs */
@@ -184,27 +190,40 @@ static void ctxdbg(BN_CTX *ctx)
 # define CTXDBG_RET(ctx,ret)
 #endif
 
+/*
+ * This function is an evil legacy and should not be used. This
+ * implementation is WYSIWYG, though I've done my best.
+ */
+#ifndef OPENSSL_NO_DEPRECATED
+void BN_CTX_init(BN_CTX *ctx)
+{
+    /*
+     * Assume the caller obtained the context via BN_CTX_new() and so is
+     * trying to reset it for use. Nothing else makes sense, least of all
+     * binary compatibility from a time when they could declare a static
+     * variable.
+     */
+    BN_POOL_reset(&ctx->pool);
+    BN_STACK_reset(&ctx->stack);
+    ctx->used = 0;
+    ctx->err_stack = 0;
+    ctx->too_many = 0;
+}
+#endif
 
 BN_CTX *BN_CTX_new(void)
 {
-    BN_CTX *ret;
-
-    if ((ret = OPENSSL_zalloc(sizeof(*ret))) == NULL) {
+    BN_CTX *ret = OPENSSL_malloc(sizeof(BN_CTX));
+    if (!ret) {
         BNerr(BN_F_BN_CTX_NEW, ERR_R_MALLOC_FAILURE);
         return NULL;
     }
     /* Initialise the structure */
     BN_POOL_init(&ret->pool);
     BN_STACK_init(&ret->stack);
-    return ret;
-}
-
-BN_CTX *BN_CTX_secure_new(void)
-{
-    BN_CTX *ret = BN_CTX_new();
-
-    if (ret != NULL)
-        ret->flags = BN_FLG_SECURE;
+    ret->used = 0;
+    ret->err_stack = 0;
+    ret->too_many = 0;
     return ret;
 }
 
@@ -266,11 +285,10 @@ void BN_CTX_end(BN_CTX *ctx)
 BIGNUM *BN_CTX_get(BN_CTX *ctx)
 {
     BIGNUM *ret;
-
     CTXDBG_ENTRY("BN_CTX_get", ctx);
     if (ctx->err_stack || ctx->too_many)
         return NULL;
-    if ((ret = BN_POOL_get(&ctx->pool, ctx->flags)) == NULL) {
+    if ((ret = BN_POOL_get(&ctx->pool)) == NULL) {
         /*
          * Setting too_many prevents repeated "get" attempts from cluttering
          * the error stack.
@@ -298,23 +316,32 @@ static void BN_STACK_init(BN_STACK *st)
 
 static void BN_STACK_finish(BN_STACK *st)
 {
-    OPENSSL_free(st->indexes);
-    st->indexes = NULL;
+    if (st->size)
+        OPENSSL_free(st->indexes);
 }
 
+#ifndef OPENSSL_NO_DEPRECATED
+static void BN_STACK_reset(BN_STACK *st)
+{
+    st->depth = 0;
+}
+#endif
 
 static int BN_STACK_push(BN_STACK *st, unsigned int idx)
 {
-    if (st->depth == st->size) {
+    if (st->depth == st->size)
         /* Need to expand */
-        unsigned int newsize =
-            st->size ? (st->size * 3 / 2) : BN_CTX_START_FRAMES;
-        unsigned int *newitems = OPENSSL_malloc(sizeof(*newitems) * newsize);
-        if (newitems == NULL)
+    {
+        unsigned int newsize = (st->size ?
+                                (st->size * 3 / 2) : BN_CTX_START_FRAMES);
+        unsigned int *newitems = OPENSSL_malloc(newsize *
+                                                sizeof(unsigned int));
+        if (!newitems)
             return 0;
         if (st->depth)
-            memcpy(newitems, st->indexes, sizeof(*newitems) * st->depth);
-        OPENSSL_free(st->indexes);
+            memcpy(newitems, st->indexes, st->depth * sizeof(unsigned int));
+        if (st->size)
+            OPENSSL_free(st->indexes);
         st->indexes = newitems;
         st->size = newsize;
     }
@@ -339,39 +366,55 @@ static void BN_POOL_init(BN_POOL *p)
 
 static void BN_POOL_finish(BN_POOL *p)
 {
-    unsigned int loop;
-    BIGNUM *bn;
-
     while (p->head) {
-        for (loop = 0, bn = p->head->vals; loop++ < BN_CTX_POOL_SIZE; bn++)
+        unsigned int loop = 0;
+        BIGNUM *bn = p->head->vals;
+        while (loop++ < BN_CTX_POOL_SIZE) {
             if (bn->d)
                 BN_clear_free(bn);
+            bn++;
+        }
         p->current = p->head->next;
         OPENSSL_free(p->head);
         p->head = p->current;
     }
 }
 
-
-static BIGNUM *BN_POOL_get(BN_POOL *p, int flag)
+#ifndef OPENSSL_NO_DEPRECATED
+static void BN_POOL_reset(BN_POOL *p)
 {
-    BIGNUM *bn;
-    unsigned int loop;
-
-    /* Full; allocate a new pool item and link it in. */
-    if (p->used == p->size) {
-        BN_POOL_ITEM *item = OPENSSL_malloc(sizeof(*item));
-        if (item == NULL)
-            return NULL;
-        for (loop = 0, bn = item->vals; loop++ < BN_CTX_POOL_SIZE; bn++) {
-            bn_init(bn);
-            if ((flag & BN_FLG_SECURE) != 0)
-                BN_set_flags(bn, BN_FLG_SECURE);
+    BN_POOL_ITEM *item = p->head;
+    while (item) {
+        unsigned int loop = 0;
+        BIGNUM *bn = item->vals;
+        while (loop++ < BN_CTX_POOL_SIZE) {
+            if (bn->d)
+                BN_clear(bn);
+            bn++;
         }
+        item = item->next;
+    }
+    p->current = p->head;
+    p->used = 0;
+}
+#endif
+
+static BIGNUM *BN_POOL_get(BN_POOL *p)
+{
+    if (p->used == p->size) {
+        BIGNUM *bn;
+        unsigned int loop = 0;
+        BN_POOL_ITEM *item = OPENSSL_malloc(sizeof(BN_POOL_ITEM));
+        if (!item)
+            return NULL;
+        /* Initialise the structure */
+        bn = item->vals;
+        while (loop++ < BN_CTX_POOL_SIZE)
+            BN_init(bn++);
         item->prev = p->tail;
         item->next = NULL;
-
-        if (p->head == NULL)
+        /* Link it in */
+        if (!p->head)
             p->head = p->current = p->tail = item;
         else {
             p->tail->next = item;
@@ -383,7 +426,6 @@ static BIGNUM *BN_POOL_get(BN_POOL *p, int flag)
         /* Return the first bignum from the new pool */
         return item->vals;
     }
-
     if (!p->used)
         p->current = p->head;
     else if ((p->used % BN_CTX_POOL_SIZE) == 0)
@@ -394,11 +436,10 @@ static BIGNUM *BN_POOL_get(BN_POOL *p, int flag)
 static void BN_POOL_release(BN_POOL *p, unsigned int num)
 {
     unsigned int offset = (p->used - 1) % BN_CTX_POOL_SIZE;
-
     p->used -= num;
     while (num--) {
         bn_check_top(p->current->vals + offset);
-        if (offset == 0) {
+        if (!offset) {
             offset = BN_CTX_POOL_SIZE - 1;
             p->current = p->current->prev;
         } else

@@ -1,3 +1,4 @@
+/* v3_skey.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,10 +58,8 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/x509v3.h>
-#include "internal/x509_int.h"
-#include "ext_dat.h"
 
 static ASN1_OCTET_STRING *s2i_skey_id(X509V3_EXT_METHOD *method,
                                       X509V3_CTX *ctx, char *str);
@@ -84,13 +83,13 @@ ASN1_OCTET_STRING *s2i_ASN1_OCTET_STRING(X509V3_EXT_METHOD *method,
     ASN1_OCTET_STRING *oct;
     long length;
 
-    if ((oct = ASN1_OCTET_STRING_new()) == NULL) {
+    if (!(oct = M_ASN1_OCTET_STRING_new())) {
         X509V3err(X509V3_F_S2I_ASN1_OCTET_STRING, ERR_R_MALLOC_FAILURE);
         return NULL;
     }
 
-    if ((oct->data = string_to_hex(str, &length)) == NULL) {
-        ASN1_OCTET_STRING_free(oct);
+    if (!(oct->data = string_to_hex(str, &length))) {
+        M_ASN1_OCTET_STRING_free(oct);
         return NULL;
     }
 
@@ -111,7 +110,7 @@ static ASN1_OCTET_STRING *s2i_skey_id(X509V3_EXT_METHOD *method,
     if (strcmp(str, "hash"))
         return s2i_ASN1_OCTET_STRING(method, ctx, str);
 
-    if ((oct = ASN1_OCTET_STRING_new()) == NULL) {
+    if (!(oct = M_ASN1_OCTET_STRING_new())) {
         X509V3err(X509V3_F_S2I_SKEY_ID, ERR_R_MALLOC_FAILURE);
         return NULL;
     }
@@ -125,9 +124,9 @@ static ASN1_OCTET_STRING *s2i_skey_id(X509V3_EXT_METHOD *method,
     }
 
     if (ctx->subject_req)
-        pk = ctx->subject_req->req_info.pubkey->public_key;
+        pk = ctx->subject_req->req_info->pubkey->public_key;
     else
-        pk = ctx->subject_cert->cert_info.key->public_key;
+        pk = ctx->subject_cert->cert_info->key->public_key;
 
     if (!pk) {
         X509V3err(X509V3_F_S2I_SKEY_ID, X509V3_R_NO_PUBLIC_KEY);
@@ -138,7 +137,7 @@ static ASN1_OCTET_STRING *s2i_skey_id(X509V3_EXT_METHOD *method,
         (pk->data, pk->length, pkey_dig, &diglen, EVP_sha1(), NULL))
         goto err;
 
-    if (!ASN1_OCTET_STRING_set(oct, pkey_dig, diglen)) {
+    if (!M_ASN1_OCTET_STRING_set(oct, pkey_dig, diglen)) {
         X509V3err(X509V3_F_S2I_SKEY_ID, ERR_R_MALLOC_FAILURE);
         goto err;
     }
@@ -146,6 +145,6 @@ static ASN1_OCTET_STRING *s2i_skey_id(X509V3_EXT_METHOD *method,
     return oct;
 
  err:
-    ASN1_OCTET_STRING_free(oct);
+    M_ASN1_OCTET_STRING_free(oct);
     return NULL;
 }

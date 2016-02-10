@@ -1,3 +1,4 @@
+/* asn_moid.c */
 /*
  * Written by Stephen Henson (steve@openssl.org) for the OpenSSL project
  * 2001.
@@ -59,11 +60,10 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <openssl/crypto.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/conf.h>
 #include <openssl/dso.h>
 #include <openssl/x509.h>
-#include "internal/asn1_int.h"
 
 /* Simple ASN1 OID module: add all objects in a given section */
 
@@ -75,9 +75,8 @@ static int oid_module_init(CONF_IMODULE *md, const CONF *cnf)
     const char *oid_section;
     STACK_OF(CONF_VALUE) *sktmp;
     CONF_VALUE *oval;
-
     oid_section = CONF_imodule_get_value(md);
-    if ((sktmp = NCONF_get_section(cnf, oid_section)) == NULL) {
+    if (!(sktmp = NCONF_get_section(cnf, oid_section))) {
         ASN1err(ASN1_F_OID_MODULE_INIT, ASN1_R_ERROR_LOADING_SECTION);
         return 0;
     }

@@ -1,3 +1,4 @@
+/* pk7_attr.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 2001.
@@ -70,8 +71,7 @@ int PKCS7_add_attrib_smimecap(PKCS7_SIGNER_INFO *si,
                               STACK_OF(X509_ALGOR) *cap)
 {
     ASN1_STRING *seq;
-
-    if ((seq = ASN1_STRING_new()) == NULL) {
+    if (!(seq = ASN1_STRING_new())) {
         PKCS7err(PKCS7_F_PKCS7_ADD_ATTRIB_SMIMECAP, ERR_R_MALLOC_FAILURE);
         return 0;
     }
@@ -87,7 +87,7 @@ STACK_OF(X509_ALGOR) *PKCS7_get_smimecap(PKCS7_SIGNER_INFO *si)
     const unsigned char *p;
 
     cap = PKCS7_get_signed_attribute(si, NID_SMIMECapabilities);
-    if (cap == NULL || (cap->type != V_ASN1_SEQUENCE))
+    if (!cap || (cap->type != V_ASN1_SEQUENCE))
         return NULL;
     p = cap->value.sequence->data;
     return (STACK_OF(X509_ALGOR) *)
@@ -100,7 +100,7 @@ int PKCS7_simple_smimecap(STACK_OF(X509_ALGOR) *sk, int nid, int arg)
 {
     X509_ALGOR *alg;
 
-    if ((alg = X509_ALGOR_new()) == NULL) {
+    if (!(alg = X509_ALGOR_new())) {
         PKCS7err(PKCS7_F_PKCS7_SIMPLE_SMIMECAP, ERR_R_MALLOC_FAILURE);
         return 0;
     }
@@ -108,11 +108,11 @@ int PKCS7_simple_smimecap(STACK_OF(X509_ALGOR) *sk, int nid, int arg)
     alg->algorithm = OBJ_nid2obj(nid);
     if (arg > 0) {
         ASN1_INTEGER *nbit;
-        if ((alg->parameter = ASN1_TYPE_new()) == NULL) {
+        if (!(alg->parameter = ASN1_TYPE_new())) {
             PKCS7err(PKCS7_F_PKCS7_SIMPLE_SMIMECAP, ERR_R_MALLOC_FAILURE);
             return 0;
         }
-        if ((nbit = ASN1_INTEGER_new()) == NULL) {
+        if (!(nbit = ASN1_INTEGER_new())) {
             PKCS7err(PKCS7_F_PKCS7_SIMPLE_SMIMECAP, ERR_R_MALLOC_FAILURE);
             return 0;
         }
@@ -139,7 +139,7 @@ int PKCS7_add_attrib_content_type(PKCS7_SIGNER_INFO *si, ASN1_OBJECT *coid)
 
 int PKCS7_add0_attrib_signing_time(PKCS7_SIGNER_INFO *si, ASN1_TIME *t)
 {
-    if (t == NULL && (t = X509_gmtime_adj(NULL, 0)) == NULL) {
+    if (!t && !(t = X509_gmtime_adj(NULL, 0))) {
         PKCS7err(PKCS7_F_PKCS7_ADD0_ATTRIB_SIGNING_TIME,
                  ERR_R_MALLOC_FAILURE);
         return 0;
@@ -153,7 +153,7 @@ int PKCS7_add1_attrib_digest(PKCS7_SIGNER_INFO *si,
 {
     ASN1_OCTET_STRING *os;
     os = ASN1_OCTET_STRING_new();
-    if (os == NULL)
+    if (!os)
         return 0;
     if (!ASN1_STRING_set(os, md, mdlen)
         || !PKCS7_add_signed_attribute(si, NID_pkcs9_messageDigest,

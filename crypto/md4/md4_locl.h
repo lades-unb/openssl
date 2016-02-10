@@ -1,3 +1,4 @@
+/* crypto/md4/md4_locl.h */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -60,6 +61,10 @@
 #include <openssl/opensslconf.h>
 #include <openssl/md4.h>
 
+#ifndef MD4_LONG_LOG2
+# define MD4_LONG_LOG2 2        /* default to 32 bits */
+#endif
+
 void md4_block_data_order(MD4_CTX *c, const void *p, size_t num);
 
 #define DATA_ORDER_IS_LITTLE_ENDIAN
@@ -79,7 +84,7 @@ void md4_block_data_order(MD4_CTX *c, const void *p, size_t num);
         } while (0)
 #define HASH_BLOCK_DATA_ORDER   md4_block_data_order
 
-#include "internal/md32_common.h"
+#include "md32_common.h"
 
 /*-
 #define F(x,y,z)        (((x) & (y))  |  ((~(x)) & (z)))

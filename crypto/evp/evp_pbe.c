@@ -1,3 +1,4 @@
+/* evp_pbe.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/evp.h>
 #include <openssl/pkcs12.h>
 #include <openssl/x509.h>
@@ -65,17 +66,18 @@
 
 /* Password based encryption (PBE) functions */
 
+DECLARE_STACK_OF(EVP_PBE_CTL)
+static STACK_OF(EVP_PBE_CTL) *pbe_algs;
+
 /* Setup a cipher context from a PBE algorithm */
 
-struct evp_pbe_st {
+typedef struct {
     int pbe_type;
     int pbe_nid;
     int cipher_nid;
     int md_nid;
     EVP_PBE_KEYGEN *keygen;
-};
-
-static STACK_OF(EVP_PBE_CTL) *pbe_algs;
+} EVP_PBE_CTL;
 
 static const EVP_PBE_CTL builtin_pbe[] = {
     {EVP_PBE_TYPE_OUTER, NID_pbeWithMD2AndDES_CBC,
@@ -85,7 +87,9 @@ static const EVP_PBE_CTL builtin_pbe[] = {
     {EVP_PBE_TYPE_OUTER, NID_pbeWithSHA1AndRC2_CBC,
      NID_rc2_64_cbc, NID_sha1, PKCS5_PBE_keyivgen},
 
+#ifndef OPENSSL_NO_HMAC
     {EVP_PBE_TYPE_OUTER, NID_id_pbkdf2, -1, -1, PKCS5_v2_PBKDF2_keyivgen},
+#endif
 
     {EVP_PBE_TYPE_OUTER, NID_pbe_WithSHA1And128BitRC4,
      NID_rc4, NID_sha1, PKCS12_PBE_keyivgen},
@@ -100,8 +104,9 @@ static const EVP_PBE_CTL builtin_pbe[] = {
     {EVP_PBE_TYPE_OUTER, NID_pbe_WithSHA1And40BitRC2_CBC,
      NID_rc2_40_cbc, NID_sha1, PKCS12_PBE_keyivgen},
 
+#ifndef OPENSSL_NO_HMAC
     {EVP_PBE_TYPE_OUTER, NID_pbes2, -1, -1, PKCS5_v2_PBE_keyivgen},
-
+#endif
     {EVP_PBE_TYPE_OUTER, NID_pbeWithMD2AndRC2_CBC,
      NID_rc2_64_cbc, NID_md2, PKCS5_PBE_keyivgen},
     {EVP_PBE_TYPE_OUTER, NID_pbeWithMD5AndRC2_CBC,
@@ -116,15 +121,32 @@ static const EVP_PBE_CTL builtin_pbe[] = {
     {EVP_PBE_TYPE_PRF, NID_hmacWithSHA384, -1, NID_sha384, 0},
     {EVP_PBE_TYPE_PRF, NID_hmacWithSHA512, -1, NID_sha512, 0},
     {EVP_PBE_TYPE_PRF, NID_id_HMACGostR3411_94, -1, NID_id_GostR3411_94, 0},
-    {EVP_PBE_TYPE_PRF, NID_id_tc26_hmac_gost_3411_2012_256, -1,
-     NID_id_GostR3411_2012_256, 0},
-    {EVP_PBE_TYPE_PRF, NID_id_tc26_hmac_gost_3411_2012_512, -1,
-     NID_id_GostR3411_2012_512, 0},
-    {EVP_PBE_TYPE_KDF, NID_id_pbkdf2, -1, -1, PKCS5_v2_PBKDF2_keyivgen},
-#ifndef OPENSSL_NO_SCRYPT
-    {EVP_PBE_TYPE_KDF, NID_id_scrypt, -1, -1, PKCS5_v2_scrypt_keyivgen}
-#endif
 };
+
+#ifdef TEST
+int main(int argc, char **argv)
+{
+    int i, nid_md, nid_cipher;
+    EVP_PBE_CTL *tpbe, *tpbe2;
+    /*
+     * OpenSSL_add_all_algorithms();
+     */
+
+    for (i = 0; i < sizeof(builtin_pbe) / sizeof(EVP_PBE_CTL); i++) {
+        tpbe = builtin_pbe + i;
+        fprintf(stderr, "%d %d %s ", tpbe->pbe_type, tpbe->pbe_nid,
+                OBJ_nid2sn(tpbe->pbe_nid));
+        if (EVP_PBE_find(tpbe->pbe_type, tpbe->pbe_nid,
+                         &nid_cipher, &nid_md, 0))
+            fprintf(stderr, "Found %s %s\n",
+                    OBJ_nid2sn(nid_cipher), OBJ_nid2sn(nid_md));
+        else
+            fprintf(stderr, "Find ERROR!!\n");
+    }
+
+    return 0;
+}
+#endif
 
 int EVP_PBE_CipherInit(ASN1_OBJECT *pbe_obj, const char *pass, int passlen,
                        ASN1_TYPE *param, EVP_CIPHER_CTX *ctx, int en_de)
@@ -139,7 +161,7 @@ int EVP_PBE_CipherInit(ASN1_OBJECT *pbe_obj, const char *pass, int passlen,
         char obj_tmp[80];
         EVPerr(EVP_F_EVP_PBE_CIPHERINIT, EVP_R_UNKNOWN_PBE_ALGORITHM);
         if (!pbe_obj)
-            OPENSSL_strlcpy(obj_tmp, "NULL", sizeof obj_tmp);
+            BUF_strlcpy(obj_tmp, "NULL", sizeof obj_tmp);
         else
             i2t_ASN1_OBJECT(obj_tmp, sizeof obj_tmp, pbe_obj);
         ERR_add_error_data(2, "TYPE=", obj_tmp);
@@ -206,16 +228,12 @@ int EVP_PBE_alg_add_type(int pbe_type, int pbe_nid, int cipher_nid,
                          int md_nid, EVP_PBE_KEYGEN *keygen)
 {
     EVP_PBE_CTL *pbe_tmp;
-
-    if (pbe_algs == NULL) {
+    if (!pbe_algs)
         pbe_algs = sk_EVP_PBE_CTL_new(pbe_cmp);
-        if (pbe_algs == NULL)
-            goto err;
+    if (!(pbe_tmp = (EVP_PBE_CTL *)OPENSSL_malloc(sizeof(EVP_PBE_CTL)))) {
+        EVPerr(EVP_F_EVP_PBE_ALG_ADD_TYPE, ERR_R_MALLOC_FAILURE);
+        return 0;
     }
-
-    if ((pbe_tmp = OPENSSL_malloc(sizeof(*pbe_tmp))) == NULL)
-        goto err;
-
     pbe_tmp->pbe_type = pbe_type;
     pbe_tmp->pbe_nid = pbe_nid;
     pbe_tmp->cipher_nid = cipher_nid;
@@ -224,17 +242,12 @@ int EVP_PBE_alg_add_type(int pbe_type, int pbe_nid, int cipher_nid,
 
     sk_EVP_PBE_CTL_push(pbe_algs, pbe_tmp);
     return 1;
-
- err:
-    EVPerr(EVP_F_EVP_PBE_ALG_ADD_TYPE, ERR_R_MALLOC_FAILURE);
-    return 0;
 }
 
 int EVP_PBE_alg_add(int nid, const EVP_CIPHER *cipher, const EVP_MD *md,
                     EVP_PBE_KEYGEN *keygen)
 {
     int cipher_nid, md_nid;
-
     if (cipher)
         cipher_nid = EVP_CIPHER_nid(cipher);
     else
@@ -265,7 +278,8 @@ int EVP_PBE_find(int type, int pbe_nid,
             pbetmp = sk_EVP_PBE_CTL_value(pbe_algs, i);
     }
     if (pbetmp == NULL) {
-        pbetmp = OBJ_bsearch_pbe2(&pbelu, builtin_pbe, OSSL_NELEM(builtin_pbe));
+        pbetmp = OBJ_bsearch_pbe2(&pbelu, builtin_pbe,
+                                  sizeof(builtin_pbe) / sizeof(EVP_PBE_CTL));
     }
     if (pbetmp == NULL)
         return 0;
@@ -280,26 +294,11 @@ int EVP_PBE_find(int type, int pbe_nid,
 
 static void free_evp_pbe_ctl(EVP_PBE_CTL *pbe)
 {
-    OPENSSL_free(pbe);
+    OPENSSL_freeFunc(pbe);
 }
 
 void EVP_PBE_cleanup(void)
 {
     sk_EVP_PBE_CTL_pop_free(pbe_algs, free_evp_pbe_ctl);
     pbe_algs = NULL;
-}
-
-int EVP_PBE_get(int *ptype, int *ppbe_nid, size_t num)
-{
-    const EVP_PBE_CTL *tpbe;
-
-    if (num >= OSSL_NELEM(builtin_pbe))
-        return 0;
-
-    tpbe = builtin_pbe + num;
-    if (ptype)
-        *ptype = tpbe->pbe_type;
-    if (ppbe_nid)
-        *ppbe_nid = tpbe->pbe_nid;
-    return 1;
 }

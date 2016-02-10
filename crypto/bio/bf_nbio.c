@@ -1,3 +1,4 @@
+/* crypto/bio/bf_nbio.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -57,7 +58,7 @@
 
 #include <stdio.h>
 #include <errno.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/rand.h>
 #include <openssl/bio.h>
 
@@ -101,12 +102,13 @@ static int nbiof_new(BIO *bi)
 {
     NBIO_TEST *nt;
 
-    if ((nt = OPENSSL_zalloc(sizeof(*nt))) == NULL)
+    if (!(nt = (NBIO_TEST *)OPENSSL_malloc(sizeof(NBIO_TEST))))
         return (0);
     nt->lrn = -1;
     nt->lwn = -1;
     bi->ptr = (char *)nt;
     bi->init = 1;
+    bi->flags = 0;
     return (1);
 }
 
@@ -114,7 +116,8 @@ static int nbiof_free(BIO *a)
 {
     if (a == NULL)
         return (0);
-    OPENSSL_free(a->ptr);
+    if (a->ptr != NULL)
+        OPENSSL_free(a->ptr);
     a->ptr = NULL;
     a->init = 0;
     a->flags = 0;
@@ -124,8 +127,10 @@ static int nbiof_free(BIO *a)
 static int nbiof_read(BIO *b, char *out, int outl)
 {
     int ret = 0;
+#if 1
     int num;
     unsigned char n;
+#endif
 
     if (out == NULL)
         return (0);
@@ -133,7 +138,8 @@ static int nbiof_read(BIO *b, char *out, int outl)
         return (0);
 
     BIO_clear_retry_flags(b);
-    if (RAND_bytes(&n, 1) <= 0)
+#if 1
+    if (RAND_pseudo_bytes(&n, 1) < 0)
         return -1;
     num = (n & 0x07);
 
@@ -143,7 +149,9 @@ static int nbiof_read(BIO *b, char *out, int outl)
     if (num == 0) {
         ret = -1;
         BIO_set_retry_read(b);
-    } else {
+    } else
+#endif
+    {
         ret = BIO_read(b->next_bio, out, outl);
         if (ret < 0)
             BIO_copy_next_retry(b);
@@ -166,11 +174,12 @@ static int nbiof_write(BIO *b, const char *in, int inl)
 
     BIO_clear_retry_flags(b);
 
+#if 1
     if (nt->lwn > 0) {
         num = nt->lwn;
         nt->lwn = 0;
     } else {
-        if (RAND_bytes(&n, 1) <= 0)
+        if (RAND_pseudo_bytes(&n, 1) < 0)
             return -1;
         num = (n & 7);
     }
@@ -181,7 +190,9 @@ static int nbiof_write(BIO *b, const char *in, int inl)
     if (num == 0) {
         ret = -1;
         BIO_set_retry_write(b);
-    } else {
+    } else
+#endif
+    {
         ret = BIO_write(b->next_bio, in, inl);
         if (ret < 0) {
             BIO_copy_next_retry(b);

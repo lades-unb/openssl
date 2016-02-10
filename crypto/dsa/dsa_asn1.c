@@ -1,3 +1,4 @@
+/* dsa_asn1.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 2000.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/dsa.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
@@ -69,8 +70,8 @@ static int sig_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it,
 {
     if (operation == ASN1_OP_NEW_PRE) {
         DSA_SIG *sig;
-        sig = OPENSSL_malloc(sizeof(*sig));
-        if (sig == NULL) {
+        sig = OPENSSL_malloc(sizeof(DSA_SIG));
+        if (!sig) {
             DSAerr(DSA_F_SIG_CB, ERR_R_MALLOC_FAILURE);
             return 0;
         }
@@ -85,9 +86,9 @@ static int sig_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it,
 ASN1_SEQUENCE_cb(DSA_SIG, sig_cb) = {
         ASN1_SIMPLE(DSA_SIG, r, CBIGNUM),
         ASN1_SIMPLE(DSA_SIG, s, CBIGNUM)
-} static_ASN1_SEQUENCE_END_cb(DSA_SIG, DSA_SIG)
+} ASN1_SEQUENCE_END_cb(DSA_SIG, DSA_SIG)
 
-IMPLEMENT_ASN1_FUNCTIONS_const(DSA_SIG)
+IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(DSA_SIG, DSA_SIG, DSA_SIG)
 
 /* Override the default free and new methods */
 static int dsa_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it,
@@ -95,7 +96,7 @@ static int dsa_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it,
 {
     if (operation == ASN1_OP_NEW_PRE) {
         *pval = (ASN1_VALUE *)DSA_new();
-        if (*pval != NULL)
+        if (*pval)
             return 2;
         return 0;
     } else if (operation == ASN1_OP_FREE_PRE) {
@@ -112,8 +113,8 @@ ASN1_SEQUENCE_cb(DSAPrivateKey, dsa_cb) = {
         ASN1_SIMPLE(DSA, q, BIGNUM),
         ASN1_SIMPLE(DSA, g, BIGNUM),
         ASN1_SIMPLE(DSA, pub_key, BIGNUM),
-        ASN1_SIMPLE(DSA, priv_key, CBIGNUM)
-} static_ASN1_SEQUENCE_END_cb(DSA, DSAPrivateKey)
+        ASN1_SIMPLE(DSA, priv_key, BIGNUM)
+} ASN1_SEQUENCE_END_cb(DSA, DSAPrivateKey)
 
 IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(DSA, DSAPrivateKey, DSAPrivateKey)
 
@@ -121,16 +122,27 @@ ASN1_SEQUENCE_cb(DSAparams, dsa_cb) = {
         ASN1_SIMPLE(DSA, p, BIGNUM),
         ASN1_SIMPLE(DSA, q, BIGNUM),
         ASN1_SIMPLE(DSA, g, BIGNUM),
-} static_ASN1_SEQUENCE_END_cb(DSA, DSAparams)
+} ASN1_SEQUENCE_END_cb(DSA, DSAparams)
 
 IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(DSA, DSAparams, DSAparams)
 
-ASN1_SEQUENCE_cb(DSAPublicKey, dsa_cb) = {
+/*
+ * DSA public key is a bit trickier... its effectively a CHOICE type decided
+ * by a field called write_params which can either write out just the public
+ * key as an INTEGER or the parameters and public key in a SEQUENCE
+ */
+
+ASN1_SEQUENCE(dsa_pub_internal) = {
         ASN1_SIMPLE(DSA, pub_key, BIGNUM),
         ASN1_SIMPLE(DSA, p, BIGNUM),
         ASN1_SIMPLE(DSA, q, BIGNUM),
         ASN1_SIMPLE(DSA, g, BIGNUM)
-} static_ASN1_SEQUENCE_END_cb(DSA, DSAPublicKey)
+} ASN1_SEQUENCE_END_name(DSA, dsa_pub_internal)
+
+ASN1_CHOICE_cb(DSAPublicKey, dsa_cb) = {
+        ASN1_SIMPLE(DSA, pub_key, BIGNUM),
+        ASN1_EX_COMBINE(0, 0, dsa_pub_internal)
+} ASN1_CHOICE_END_cb(DSA, DSAPublicKey, write_params)
 
 IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(DSA, DSAPublicKey, DSAPublicKey)
 
@@ -181,7 +193,10 @@ int DSA_verify(int type, const unsigned char *dgst, int dgst_len,
         goto err;
     ret = DSA_do_verify(dgst, dgst_len, s, dsa);
  err:
-    OPENSSL_clear_free(der, derlen);
+    if (derlen > 0) {
+        OPENSSL_cleanse(der, derlen);
+        OPENSSL_free(der);
+    }
     DSA_SIG_free(s);
     return (ret);
 }

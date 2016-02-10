@@ -1,3 +1,4 @@
+/* crypto/bio/bio_cb.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -58,15 +59,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/bio.h>
 #include <openssl/err.h>
 
-long BIO_debug_callback(BIO *bio, int cmd, const char *argp,
-                        int argi, long argl, long ret)
+long MS_CALLBACK BIO_debug_callback(BIO *bio, int cmd, const char *argp,
+                                    int argi, long argl, long ret)
 {
     BIO *b;
-    char buf[256];
+    MS_STATIC char buf[256];
     char *p;
     long r = 1;
     int len;
@@ -136,7 +137,7 @@ long BIO_debug_callback(BIO *bio, int cmd, const char *argp,
     b = (BIO *)bio->cb_arg;
     if (b != NULL)
         BIO_write(b, buf, strlen(buf));
-#if !defined(OPENSSL_NO_STDIO)
+#if !defined(OPENSSL_NO_STDIO) && !defined(OPENSSL_SYS_WIN16)
     else
         fputs(buf, stderr);
 #endif

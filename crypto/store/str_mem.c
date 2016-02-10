@@ -1,3 +1,4 @@
+/* crypto/store/str_mem.c -*- mode:C; c-file-style: "eay" -*- */
 /*
  * Written by Richard Levitte (richard@levitte.org) for the OpenSSL project
  * 2003.
@@ -82,7 +83,7 @@ typedef struct mem_object_data_st {
     int references;
 } MEM_OBJECT_DATA;
 
-DEFINE_STACK_OF(MEM_OBJECT_DATA)
+DECLARE_STACK_OF(MEM_OBJECT_DATA)
 struct mem_data_st {
     /*
      * sorted with
@@ -97,7 +98,7 @@ struct mem_data_st {
     unsigned int compute_components:1;
 };
 
-DEFINE_STACK_OF(STORE_ATTR_INFO)
+DECLARE_STACK_OF(STORE_ATTR_INFO)
 struct mem_ctx_st {
     /* The type we're searching for */
     int type;
@@ -243,14 +244,16 @@ static void *mem_list_start(STORE *s, STORE_OBJECT_TYPES type,
                             OPENSSL_ITEM attributes[],
                             OPENSSL_ITEM parameters[])
 {
-    struct mem_ctx_st *context = OPENSSL_zalloc(sizeof(*context));
+    struct mem_ctx_st *context =
+        (struct mem_ctx_st *)OPENSSL_malloc(sizeof(struct mem_ctx_st));
     void *attribute_context = NULL;
     STORE_ATTR_INFO *attrs = NULL;
 
-    if (context == NULL) {
+    if (!context) {
         STOREerr(STORE_F_MEM_LIST_START, ERR_R_MALLOC_FAILURE);
         return 0;
     }
+    memset(context, 0, sizeof(struct mem_ctx_st));
 
     attribute_context = STORE_parse_attrs_start(attributes);
     if (!attribute_context) {
@@ -262,7 +265,7 @@ static void *mem_list_start(STORE *s, STORE_OBJECT_TYPES type,
         if (context->search_attributes == NULL) {
             context->search_attributes =
                 sk_STORE_ATTR_INFO_new(STORE_ATTR_INFO_compare);
-            if (context->search_attributes == NULL) {
+            if (!context->search_attributes) {
                 STOREerr(STORE_F_MEM_LIST_START, ERR_R_MALLOC_FAILURE);
                 goto err;
             }
@@ -344,9 +347,10 @@ static int mem_list_end(STORE *s, void *handle)
         STOREerr(STORE_F_MEM_LIST_END, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
     }
-    if (context)
+    if (context && context->search_attributes)
         sk_STORE_ATTR_INFO_free(context->search_attributes);
-    OPENSSL_free(context);
+    if (context)
+        OPENSSL_free(context);
     return 1;
 }
 

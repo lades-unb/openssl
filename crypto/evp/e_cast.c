@@ -1,3 +1,4 @@
+/* crypto/evp/e_cast.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,12 +57,12 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 
 #ifndef OPENSSL_NO_CAST
 # include <openssl/evp.h>
 # include <openssl/objects.h>
-# include "internal/evp_int.h"
+# include "evp_locl.h"
 # include <openssl/cast.h>
 
 static int cast_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,

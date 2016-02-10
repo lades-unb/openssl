@@ -1,3 +1,4 @@
+/* crypto/dsa/dsa_gen.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -55,35 +56,74 @@
  * [including the GNU Public Licence.]
  */
 
+#undef GENUINE_DSA
+
+#ifdef GENUINE_DSA
+/*
+ * Parameter generation follows the original release of FIPS PUB 186,
+ * Appendix 2.2 (i.e. use SHA as defined in FIPS PUB 180)
+ */
+# define HASH    EVP_sha()
+#else
 /*
  * Parameter generation follows the updated Appendix 2.2 for FIPS PUB 186,
  * also Appendix 2.2 of FIPS PUB 186-1 (i.e. use SHA as defined in FIPS PUB
  * 180-1)
  */
-#define xxxHASH    EVP_sha1()
+# define HASH    EVP_sha1()
+#endif
 
 #include <openssl/opensslconf.h> /* To see if OPENSSL_NO_SHA is defined */
 
-#include <stdio.h>
-#include "internal/cryptlib.h"
-#include <openssl/evp.h>
-#include <openssl/bn.h>
-#include <openssl/rand.h>
-#include <openssl/sha.h>
+#ifndef OPENSSL_NO_SHA
 
-#include "dsa_locl.h"
+# include <stdio.h>
+# include "cryptlib.h"
+# include <openssl/evp.h>
+# include <openssl/bn.h>
+# include <openssl/rand.h>
+# include <openssl/sha.h>
+# include "dsa_locl.h"
+
+# ifdef OPENSSL_FIPS
+/* Workaround bug in prototype */
+#  define fips_dsa_builtin_paramgen2 fips_dsa_paramgen_bad
+#  include <openssl/fips.h>
+# endif
 
 int DSA_generate_parameters_ex(DSA *ret, int bits,
                                const unsigned char *seed_in, int seed_len,
                                int *counter_ret, unsigned long *h_ret,
                                BN_GENCB *cb)
 {
+# ifdef OPENSSL_FIPS
+    if (FIPS_mode() && !(ret->meth->flags & DSA_FLAG_FIPS_METHOD)
+        && !(ret->flags & DSA_FLAG_NON_FIPS_ALLOW)) {
+        DSAerr(DSA_F_DSA_GENERATE_PARAMETERS_EX, DSA_R_NON_FIPS_DSA_METHOD);
+        return 0;
+    }
+# endif
     if (ret->meth->dsa_paramgen)
         return ret->meth->dsa_paramgen(ret, bits, seed_in, seed_len,
                                        counter_ret, h_ret, cb);
+# ifdef OPENSSL_FIPS
+    else if (FIPS_mode()) {
+        return FIPS_dsa_generate_parameters_ex(ret, bits,
+                                               seed_in, seed_len,
+                                               counter_ret, h_ret, cb);
+    }
+# endif
     else {
-        const EVP_MD *evpmd = bits >= 2048 ? EVP_sha256() : EVP_sha1();
-        size_t qbits = EVP_MD_size(evpmd) * 8;
+        const EVP_MD *evpmd;
+        size_t qbits = bits >= 2048 ? 256 : 160;
+
+        if (bits >= 2048) {
+            qbits = 256;
+            evpmd = EVP_sha256();
+        } else {
+            qbits = 160;
+            evpmd = EVP_sha1();
+        }
 
         return dsa_builtin_paramgen(ret, bits, qbits, evpmd,
                                     seed_in, seed_len, NULL, counter_ret,
@@ -123,24 +163,26 @@ int dsa_builtin_paramgen(DSA *ret, size_t bits, size_t qbits,
 
     bits = (bits + 63) / 64 * 64;
 
-    if (seed_in != NULL) {
-        if (seed_len < (size_t)qsize)
-            return 0;
-        if (seed_len > (size_t)qsize) {
-            /* Only consume as much seed as is expected. */
-            seed_len = qsize;
-        }
+    /*
+     * NB: seed_len == 0 is special case: copy generated seed to seed_in if
+     * it is not NULL.
+     */
+    if (seed_len && (seed_len < (size_t)qsize))
+        seed_in = NULL;         /* seed buffer too small -- ignore */
+    if (seed_len > (size_t)qsize)
+        seed_len = qsize;       /* App. 2.2 of FIPS PUB 186 allows larger
+                                 * SEED, but our internal buffers are
+                                 * restricted to 160 bits */
+    if (seed_in != NULL)
         memcpy(seed, seed_in, seed_len);
-    }
-
-    if ((mont = BN_MONT_CTX_new()) == NULL)
-        goto err;
 
     if ((ctx = BN_CTX_new()) == NULL)
         goto err;
 
-    BN_CTX_start(ctx);
+    if ((mont = BN_MONT_CTX_new()) == NULL)
+        goto err;
 
+    BN_CTX_start(ctx);
     r0 = BN_CTX_get(ctx);
     g = BN_CTX_get(ctx);
     W = BN_CTX_get(ctx);
@@ -155,18 +197,20 @@ int dsa_builtin_paramgen(DSA *ret, size_t bits, size_t qbits,
 
     for (;;) {
         for (;;) {              /* find q */
-            int use_random_seed = (seed_in == NULL);
+            int seed_is_random;
 
             /* step 1 */
             if (!BN_GENCB_call(cb, 0, m++))
                 goto err;
 
-            if (use_random_seed) {
-                if (RAND_bytes(seed, qsize) <= 0)
+            if (!seed_len) {
+                if (RAND_pseudo_bytes(seed, qsize) < 0)
                     goto err;
+                seed_is_random = 1;
             } else {
-                /* If we come back through, use random seed next time. */
-                seed_in = NULL;
+                seed_is_random = 0;
+                seed_len = 0;   /* use random seed if 'seed_in' turns out to
+                                 * be bad */
             }
             memcpy(buf, seed, qsize);
             memcpy(buf2, seed, qsize);
@@ -193,7 +237,7 @@ int dsa_builtin_paramgen(DSA *ret, size_t bits, size_t qbits,
 
             /* step 4 */
             r = BN_is_prime_fasttest_ex(q, DSS_prime_checks, ctx,
-                                        use_random_seed, cb);
+                                        seed_is_random, cb);
             if (r > 0)
                 break;
             if (r != 0)
@@ -313,9 +357,12 @@ int dsa_builtin_paramgen(DSA *ret, size_t bits, size_t qbits,
     ok = 1;
  err:
     if (ok) {
-        BN_free(ret->p);
-        BN_free(ret->q);
-        BN_free(ret->g);
+        if (ret->p)
+            BN_free(ret->p);
+        if (ret->q)
+            BN_free(ret->q);
+        if (ret->g)
+            BN_free(ret->g);
         ret->p = BN_dup(p);
         ret->q = BN_dup(q);
         ret->g = BN_dup(g);
@@ -330,12 +377,25 @@ int dsa_builtin_paramgen(DSA *ret, size_t bits, size_t qbits,
         if (seed_out)
             memcpy(seed_out, seed, qsize);
     }
-    if (ctx)
+    if (ctx) {
         BN_CTX_end(ctx);
-    BN_CTX_free(ctx);
-    BN_MONT_CTX_free(mont);
+        BN_CTX_free(ctx);
+    }
+    if (mont != NULL)
+        BN_MONT_CTX_free(mont);
     return ok;
 }
+
+# ifdef OPENSSL_FIPS
+#  undef fips_dsa_builtin_paramgen2
+extern int fips_dsa_builtin_paramgen2(DSA *ret, size_t L, size_t N,
+                                      const EVP_MD *evpmd,
+                                      const unsigned char *seed_in,
+                                      size_t seed_len, int idx,
+                                      unsigned char *seed_out,
+                                      int *counter_ret, unsigned long *h_ret,
+                                      BN_GENCB *cb);
+# endif
 
 /*
  * This is a parameter generation algorithm for the DSA2 algorithm as
@@ -359,11 +419,18 @@ int dsa_builtin_paramgen2(DSA *ret, size_t L, size_t N,
     int counter = 0;
     int r = 0;
     BN_CTX *ctx = NULL;
-    EVP_MD_CTX *mctx = EVP_MD_CTX_new();
+    EVP_MD_CTX mctx;
     unsigned int h = 2;
 
-    if (mctx == NULL)
-        goto err;
+# ifdef OPENSSL_FIPS
+
+    if (FIPS_mode())
+        return fips_dsa_builtin_paramgen2(ret, L, N, evpmd,
+                                          seed_in, seed_len, idx,
+                                          seed_out, counter_ret, h_ret, cb);
+# endif
+
+    EVP_MD_CTX_init(&mctx);
 
     if (evpmd == NULL) {
         if (N == 160)
@@ -375,7 +442,7 @@ int dsa_builtin_paramgen2(DSA *ret, size_t L, size_t N,
     }
 
     mdsize = EVP_MD_size(evpmd);
-    /* If unverifiable g generation only don't need seed */
+    /* If unverificable g generation only don't need seed */
     if (!ret->p || !ret->q || idx >= 0) {
         if (seed_len == 0)
             seed_len = mdsize;
@@ -387,7 +454,7 @@ int dsa_builtin_paramgen2(DSA *ret, size_t L, size_t N,
         else
             seed_tmp = OPENSSL_malloc(seed_len);
 
-        if (seed == NULL || seed_tmp == NULL)
+        if (!seed || !seed_tmp)
             goto err;
 
         if (seed_in)
@@ -431,7 +498,7 @@ int dsa_builtin_paramgen2(DSA *ret, size_t L, size_t N,
                 goto err;
 
             if (!seed_in) {
-                if (RAND_bytes(seed, seed_len) <= 0)
+                if (RAND_pseudo_bytes(seed, seed_len) < 0)
                     goto err;
             }
             /* step 2 */
@@ -582,15 +649,15 @@ int dsa_builtin_paramgen2(DSA *ret, size_t L, size_t N,
             md[0] = idx & 0xff;
             md[1] = (h >> 8) & 0xff;
             md[2] = h & 0xff;
-            if (!EVP_DigestInit_ex(mctx, evpmd, NULL))
+            if (!EVP_DigestInit_ex(&mctx, evpmd, NULL))
                 goto err;
-            if (!EVP_DigestUpdate(mctx, seed_tmp, seed_len))
+            if (!EVP_DigestUpdate(&mctx, seed_tmp, seed_len))
                 goto err;
-            if (!EVP_DigestUpdate(mctx, ggen, sizeof(ggen)))
+            if (!EVP_DigestUpdate(&mctx, ggen, sizeof(ggen)))
                 goto err;
-            if (!EVP_DigestUpdate(mctx, md, 3))
+            if (!EVP_DigestUpdate(&mctx, md, 3))
                 goto err;
-            if (!EVP_DigestFinal_ex(mctx, md, NULL))
+            if (!EVP_DigestFinal_ex(&mctx, md, NULL))
                 goto err;
             if (!BN_bin2bn(md, mdsize, test))
                 goto err;
@@ -614,14 +681,17 @@ int dsa_builtin_paramgen2(DSA *ret, size_t L, size_t N,
  err:
     if (ok == 1) {
         if (p != ret->p) {
-            BN_free(ret->p);
+            if (ret->p)
+                BN_free(ret->p);
             ret->p = BN_dup(p);
         }
         if (q != ret->q) {
-            BN_free(ret->q);
+            if (ret->q)
+                BN_free(ret->q);
             ret->q = BN_dup(q);
         }
-        BN_free(ret->g);
+        if (ret->g)
+            BN_free(ret->g);
         ret->g = BN_dup(g);
         if (ret->p == NULL || ret->q == NULL || ret->g == NULL) {
             ok = -1;
@@ -632,14 +702,17 @@ int dsa_builtin_paramgen2(DSA *ret, size_t L, size_t N,
         if (h_ret != NULL)
             *h_ret = h;
     }
-    OPENSSL_free(seed);
+    if (seed)
+        OPENSSL_free(seed);
     if (seed_out != seed_tmp)
         OPENSSL_free(seed_tmp);
-    if (ctx)
+    if (ctx) {
         BN_CTX_end(ctx);
-    BN_CTX_free(ctx);
-    BN_MONT_CTX_free(mont);
-    EVP_MD_CTX_free(mctx);
+        BN_CTX_free(ctx);
+    }
+    if (mont != NULL)
+        BN_MONT_CTX_free(mont);
+    EVP_MD_CTX_cleanup(&mctx);
     return ok;
 }
 
@@ -650,7 +723,7 @@ int dsa_paramgen_check_g(DSA *dsa)
     BN_MONT_CTX *mont = NULL;
     int rv = -1;
     ctx = BN_CTX_new();
-    if (ctx == NULL)
+    if (!ctx)
         return -1;
     BN_CTX_start(ctx);
     if (BN_cmp(dsa->g, BN_value_one()) <= 0)
@@ -673,8 +746,10 @@ int dsa_paramgen_check_g(DSA *dsa)
         rv = 0;
  err:
     BN_CTX_end(ctx);
-    BN_MONT_CTX_free(mont);
+    if (mont)
+        BN_MONT_CTX_free(mont);
     BN_CTX_free(ctx);
     return rv;
 
 }
+#endif

@@ -78,12 +78,12 @@ const char *LP_find_file(LP_DIR_CTX **ctx, const char *directory)
 
     errno = 0;
     if (*ctx == NULL) {
-        *ctx = malloc(sizeof(**ctx));
+        *ctx = (LP_DIR_CTX *)malloc(sizeof(LP_DIR_CTX));
         if (*ctx == NULL) {
             errno = ENOMEM;
             return 0;
         }
-        memset(*ctx, 0, sizeof(**ctx));
+        memset(*ctx, '\0', sizeof(LP_DIR_CTX));
 
         (*ctx)->dir = opendir(directory);
         if ((*ctx)->dir == NULL) {

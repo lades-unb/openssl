@@ -1,3 +1,4 @@
+/* crypto/evp/bio_md.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -57,11 +58,9 @@
 
 #include <stdio.h>
 #include <errno.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
-#include "internal/evp_int.h"
-#include "evp_locl.h"
 
 /*
  * BIO_put and BIO_get both add to the digest, BIO_gets returns the digest
@@ -99,7 +98,7 @@ static int md_new(BIO *bi)
 {
     EVP_MD_CTX *ctx;
 
-    ctx = EVP_MD_CTX_new();
+    ctx = EVP_MD_CTX_create();
     if (ctx == NULL)
         return (0);
 
@@ -113,7 +112,7 @@ static int md_free(BIO *a)
 {
     if (a == NULL)
         return (0);
-    EVP_MD_CTX_free(a->ptr);
+    EVP_MD_CTX_destroy(a->ptr);
     a->ptr = NULL;
     a->init = 0;
     a->flags = 0;

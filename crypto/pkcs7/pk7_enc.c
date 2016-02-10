@@ -1,3 +1,4 @@
+/* crypto/pkcs7/pk7_enc.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,7 +57,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/objects.h>
@@ -66,7 +67,8 @@
 PKCS7_in_bio(PKCS7 *p7, BIO *in);
 PKCS7_out_bio(PKCS7 *p7, BIO *out);
 
-PKCS7_add_signer(PKCS7 *p7, X509 *cert, EVP_PKEY *key);
+//PKCS7_add_signer(PKCS7 *p7, X509 *cert, EVP_PKEY *key);
+PKCS7_add_signer(PKCS7 *p7, PKCS7_SIGNER_INFO *psi);
 PKCS7_cipher(PKCS7 *p7, EVP_CIPHER *cipher);
 
 PKCS7_Init(PKCS7 *p7);

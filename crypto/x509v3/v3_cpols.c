@@ -1,3 +1,4 @@
+/* v3_cpols.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,14 +58,13 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/conf.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/x509v3.h>
 
 #include "pcy_int.h"
-#include "ext_dat.h"
 
 /* Certificate policies extension support: this one is a bit complex... */
 
@@ -162,7 +162,7 @@ static STACK_OF(POLICYINFO) *r2i_certpol(X509V3_EXT_METHOD *method,
             goto err;
         }
         pstr = cnf->name;
-        if (strcmp(pstr, "ia5org") == 0) {
+        if (!strcmp(pstr, "ia5org")) {
             ia5org = 1;
             continue;
         } else if (*pstr == '@') {
@@ -176,20 +176,16 @@ static STACK_OF(POLICYINFO) *r2i_certpol(X509V3_EXT_METHOD *method,
             }
             pol = policy_section(ctx, polsect, ia5org);
             X509V3_section_free(ctx, polsect);
-            if (pol == NULL)
+            if (!pol)
                 goto err;
         } else {
-            if ((pobj = OBJ_txt2obj(cnf->name, 0)) == NULL) {
+            if (!(pobj = OBJ_txt2obj(cnf->name, 0))) {
                 X509V3err(X509V3_F_R2I_CERTPOL,
                           X509V3_R_INVALID_OBJECT_IDENTIFIER);
                 X509V3_conf_err(cnf);
                 goto err;
             }
             pol = POLICYINFO_new();
-            if (pol == NULL) {
-                X509V3err(X509V3_F_R2I_CERTPOL, ERR_R_MALLOC_FAILURE);
-                goto err;
-            }
             pol->policyid = pobj;
         }
         if (!sk_POLICYINFO_push(pols, pol)) {
@@ -213,14 +209,13 @@ static POLICYINFO *policy_section(X509V3_CTX *ctx,
     CONF_VALUE *cnf;
     POLICYINFO *pol;
     POLICYQUALINFO *qual;
-
-    if ((pol = POLICYINFO_new()) == NULL)
+    if (!(pol = POLICYINFO_new()))
         goto merr;
     for (i = 0; i < sk_CONF_VALUE_num(polstrs); i++) {
         cnf = sk_CONF_VALUE_value(polstrs, i);
-        if (strcmp(cnf->name, "policyIdentifier") == 0) {
+        if (!strcmp(cnf->name, "policyIdentifier")) {
             ASN1_OBJECT *pobj;
-            if ((pobj = OBJ_txt2obj(cnf->value, 0)) == NULL) {
+            if (!(pobj = OBJ_txt2obj(cnf->value, 0))) {
                 X509V3err(X509V3_F_POLICY_SECTION,
                           X509V3_R_INVALID_OBJECT_IDENTIFIER);
                 X509V3_conf_err(cnf);
@@ -229,17 +224,17 @@ static POLICYINFO *policy_section(X509V3_CTX *ctx,
             pol->policyid = pobj;
 
         } else if (!name_cmp(cnf->name, "CPS")) {
-            if (pol->qualifiers == NULL)
+            if (!pol->qualifiers)
                 pol->qualifiers = sk_POLICYQUALINFO_new_null();
-            if ((qual = POLICYQUALINFO_new()) == NULL)
+            if (!(qual = POLICYQUALINFO_new()))
                 goto merr;
             if (!sk_POLICYQUALINFO_push(pol->qualifiers, qual))
                 goto merr;
-            if ((qual->pqualid = OBJ_nid2obj(NID_id_qt_cps)) == NULL) {
+            if (!(qual->pqualid = OBJ_nid2obj(NID_id_qt_cps))) {
                 X509V3err(X509V3_F_POLICY_SECTION, ERR_R_INTERNAL_ERROR);
                 goto err;
             }
-            if ((qual->d.cpsuri = ASN1_IA5STRING_new()) == NULL)
+            if (!(qual->d.cpsuri = M_ASN1_IA5STRING_new()))
                 goto merr;
             if (!ASN1_STRING_set(qual->d.cpsuri, cnf->value,
                                  strlen(cnf->value)))
@@ -297,28 +292,27 @@ static POLICYQUALINFO *notice_section(X509V3_CTX *ctx,
     CONF_VALUE *cnf;
     USERNOTICE *not;
     POLICYQUALINFO *qual;
-
-    if ((qual = POLICYQUALINFO_new()) == NULL)
+    if (!(qual = POLICYQUALINFO_new()))
         goto merr;
-    if ((qual->pqualid = OBJ_nid2obj(NID_id_qt_unotice)) == NULL) {
+    if (!(qual->pqualid = OBJ_nid2obj(NID_id_qt_unotice))) {
         X509V3err(X509V3_F_NOTICE_SECTION, ERR_R_INTERNAL_ERROR);
         goto err;
     }
-    if ((not = USERNOTICE_new()) == NULL)
+    if (!(not = USERNOTICE_new()))
         goto merr;
     qual->d.usernotice = not;
     for (i = 0; i < sk_CONF_VALUE_num(unot); i++) {
         cnf = sk_CONF_VALUE_value(unot, i);
-        if (strcmp(cnf->name, "explicitText") == 0) {
-            if ((not->exptext = ASN1_VISIBLESTRING_new()) == NULL)
+        if (!strcmp(cnf->name, "explicitText")) {
+            if (!(not->exptext = M_ASN1_VISIBLESTRING_new()))
                 goto merr;
             if (!ASN1_STRING_set(not->exptext, cnf->value,
                                  strlen(cnf->value)))
                 goto merr;
-        } else if (strcmp(cnf->name, "organization") == 0) {
+        } else if (!strcmp(cnf->name, "organization")) {
             NOTICEREF *nref;
             if (!not->noticeref) {
-                if ((nref = NOTICEREF_new()) == NULL)
+                if (!(nref = NOTICEREF_new()))
                     goto merr;
                 not->noticeref = nref;
             } else
@@ -330,11 +324,11 @@ static POLICYQUALINFO *notice_section(X509V3_CTX *ctx,
             if (!ASN1_STRING_set(nref->organization, cnf->value,
                                  strlen(cnf->value)))
                 goto merr;
-        } else if (strcmp(cnf->name, "noticeNumbers") == 0) {
+        } else if (!strcmp(cnf->name, "noticeNumbers")) {
             NOTICEREF *nref;
             STACK_OF(CONF_VALUE) *nos;
             if (!not->noticeref) {
-                if ((nref = NOTICEREF_new()) == NULL)
+                if (!(nref = NOTICEREF_new()))
                     goto merr;
                 not->noticeref = nref;
             } else
@@ -382,7 +376,7 @@ static int nref_nos(STACK_OF(ASN1_INTEGER) *nnums, STACK_OF(CONF_VALUE) *nos)
 
     for (i = 0; i < sk_CONF_VALUE_num(nos); i++) {
         cnf = sk_CONF_VALUE_value(nos, i);
-        if ((aint = s2i_ASN1_INTEGER(NULL, cnf->name)) == NULL) {
+        if (!(aint = s2i_ASN1_INTEGER(NULL, cnf->name))) {
             X509V3err(X509V3_F_NREF_NOS, X509V3_R_INVALID_NUMBER);
             goto err;
         }
@@ -486,3 +480,8 @@ void X509_POLICY_NODE_print(BIO *out, X509_POLICY_NODE *node, int indent)
     else
         BIO_printf(out, "%*sNo Qualifiers\n", indent + 2, "");
 }
+
+
+IMPLEMENT_STACK_OF(X509_POLICY_NODE)
+
+IMPLEMENT_STACK_OF(X509_POLICY_DATA)

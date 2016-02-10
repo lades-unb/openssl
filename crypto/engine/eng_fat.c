@@ -1,3 +1,4 @@
+/* crypto/engine/eng_fat.c */
 /* ====================================================================
  * Copyright (c) 1999-2001 The OpenSSL Project.  All rights reserved.
  *
@@ -78,8 +79,12 @@ int ENGINE_set_default(ENGINE *e, unsigned int flags)
     if ((flags & ENGINE_METHOD_DH) && !ENGINE_set_default_DH(e))
         return 0;
 #endif
-#ifndef OPENSSL_NO_EC
-    if ((flags & ENGINE_METHOD_EC) && !ENGINE_set_default_EC(e))
+#ifndef OPENSSL_NO_ECDH
+    if ((flags & ENGINE_METHOD_ECDH) && !ENGINE_set_default_ECDH(e))
+        return 0;
+#endif
+#ifndef OPENSSL_NO_ECDSA
+    if ((flags & ENGINE_METHOD_ECDSA) && !ENGINE_set_default_ECDSA(e))
         return 0;
 #endif
     if ((flags & ENGINE_METHOD_RAND) && !ENGINE_set_default_RAND(e))
@@ -100,27 +105,29 @@ static int int_def_cb(const char *alg, int len, void *arg)
     unsigned int *pflags = arg;
     if (alg == NULL)
         return 0;
-    if (strncmp(alg, "ALL", len) == 0)
+    if (!strncmp(alg, "ALL", len))
         *pflags |= ENGINE_METHOD_ALL;
-    else if (strncmp(alg, "RSA", len) == 0)
+    else if (!strncmp(alg, "RSA", len))
         *pflags |= ENGINE_METHOD_RSA;
-    else if (strncmp(alg, "DSA", len) == 0)
+    else if (!strncmp(alg, "DSA", len))
         *pflags |= ENGINE_METHOD_DSA;
-    else if (strncmp(alg, "DH", len) == 0)
+    else if (!strncmp(alg, "ECDH", len))
+        *pflags |= ENGINE_METHOD_ECDH;
+    else if (!strncmp(alg, "ECDSA", len))
+        *pflags |= ENGINE_METHOD_ECDSA;
+    else if (!strncmp(alg, "DH", len))
         *pflags |= ENGINE_METHOD_DH;
-    else if (strncmp(alg, "EC", len) == 0)
-        *pflags |= ENGINE_METHOD_EC;
-    else if (strncmp(alg, "RAND", len) == 0)
+    else if (!strncmp(alg, "RAND", len))
         *pflags |= ENGINE_METHOD_RAND;
-    else if (strncmp(alg, "CIPHERS", len) == 0)
+    else if (!strncmp(alg, "CIPHERS", len))
         *pflags |= ENGINE_METHOD_CIPHERS;
-    else if (strncmp(alg, "DIGESTS", len) == 0)
+    else if (!strncmp(alg, "DIGESTS", len))
         *pflags |= ENGINE_METHOD_DIGESTS;
-    else if (strncmp(alg, "PKEY", len) == 0)
+    else if (!strncmp(alg, "PKEY", len))
         *pflags |= ENGINE_METHOD_PKEY_METHS | ENGINE_METHOD_PKEY_ASN1_METHS;
-    else if (strncmp(alg, "PKEY_CRYPTO", len) == 0)
+    else if (!strncmp(alg, "PKEY_CRYPTO", len))
         *pflags |= ENGINE_METHOD_PKEY_METHS;
-    else if (strncmp(alg, "PKEY_ASN1", len) == 0)
+    else if (!strncmp(alg, "PKEY_ASN1", len))
         *pflags |= ENGINE_METHOD_PKEY_ASN1_METHS;
     else
         return 0;
@@ -152,8 +159,11 @@ int ENGINE_register_complete(ENGINE *e)
 #ifndef OPENSSL_NO_DH
     ENGINE_register_DH(e);
 #endif
-#ifndef OPENSSL_NO_EC
-    ENGINE_register_EC(e);
+#ifndef OPENSSL_NO_ECDH
+    ENGINE_register_ECDH(e);
+#endif
+#ifndef OPENSSL_NO_ECDSA
+    ENGINE_register_ECDSA(e);
 #endif
     ENGINE_register_RAND(e);
     ENGINE_register_pkey_meths(e);

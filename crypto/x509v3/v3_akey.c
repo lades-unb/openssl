@@ -1,3 +1,4 @@
+/* v3_akey.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,12 +58,11 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/conf.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/x509v3.h>
-#include "ext_dat.h"
 
 static STACK_OF(CONF_VALUE) *i2v_AUTHORITY_KEYID(X509V3_EXT_METHOD *method,
                                                  AUTHORITY_KEYID *akeyid,
@@ -131,13 +131,13 @@ static AUTHORITY_KEYID *v2i_AUTHORITY_KEYID(X509V3_EXT_METHOD *method,
 
     for (i = 0; i < sk_CONF_VALUE_num(values); i++) {
         cnf = sk_CONF_VALUE_value(values, i);
-        if (strcmp(cnf->name, "keyid") == 0) {
+        if (!strcmp(cnf->name, "keyid")) {
             keyid = 1;
-            if (cnf->value && strcmp(cnf->value, "always") == 0)
+            if (cnf->value && !strcmp(cnf->value, "always"))
                 keyid = 2;
-        } else if (strcmp(cnf->name, "issuer") == 0) {
+        } else if (!strcmp(cnf->name, "issuer")) {
             issuer = 1;
-            if (cnf->value && strcmp(cnf->value, "always") == 0)
+            if (cnf->value && !strcmp(cnf->value, "always"))
                 issuer = 2;
         } else {
             X509V3err(X509V3_F_V2I_AUTHORITY_KEYID, X509V3_R_UNKNOWN_OPTION);
@@ -169,7 +169,7 @@ static AUTHORITY_KEYID *v2i_AUTHORITY_KEYID(X509V3_EXT_METHOD *method,
 
     if ((issuer && !ikeyid) || (issuer == 2)) {
         isname = X509_NAME_dup(X509_get_issuer_name(cert));
-        serial = ASN1_INTEGER_dup(X509_get_serialNumber(cert));
+        serial = M_ASN1_INTEGER_dup(X509_get_serialNumber(cert));
         if (!isname || !serial) {
             X509V3err(X509V3_F_V2I_AUTHORITY_KEYID,
                       X509V3_R_UNABLE_TO_GET_ISSUER_DETAILS);
@@ -177,12 +177,12 @@ static AUTHORITY_KEYID *v2i_AUTHORITY_KEYID(X509V3_EXT_METHOD *method,
         }
     }
 
-    if ((akeyid = AUTHORITY_KEYID_new()) == NULL)
+    if (!(akeyid = AUTHORITY_KEYID_new()))
         goto err;
 
     if (isname) {
-        if ((gens = sk_GENERAL_NAME_new_null()) == NULL
-            || (gen = GENERAL_NAME_new()) == NULL
+        if (!(gens = sk_GENERAL_NAME_new_null())
+            || !(gen = GENERAL_NAME_new())
             || !sk_GENERAL_NAME_push(gens, gen)) {
             X509V3err(X509V3_F_V2I_AUTHORITY_KEYID, ERR_R_MALLOC_FAILURE);
             goto err;
@@ -199,7 +199,7 @@ static AUTHORITY_KEYID *v2i_AUTHORITY_KEYID(X509V3_EXT_METHOD *method,
 
  err:
     X509_NAME_free(isname);
-    ASN1_INTEGER_free(serial);
-    ASN1_OCTET_STRING_free(ikeyid);
+    M_ASN1_INTEGER_free(serial);
+    M_ASN1_OCTET_STRING_free(ikeyid);
     return NULL;
 }

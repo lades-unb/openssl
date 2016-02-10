@@ -1,3 +1,4 @@
+/* crypto/evp/e_rc2.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,13 +57,13 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 
 #ifndef OPENSSL_NO_RC2
 
 # include <openssl/evp.h>
 # include <openssl/objects.h>
-# include "internal/evp_int.h"
+# include "evp_locl.h"
 # include <openssl/rc2.h>
 
 static int rc2_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
@@ -78,7 +79,7 @@ typedef struct {
     RC2_KEY ks;                 /* key schedule */
 } EVP_RC2_KEY;
 
-# define data(ctx)       EVP_C_DATA(EVP_RC2_KEY,ctx)
+# define data(ctx)       ((EVP_RC2_KEY *)(ctx)->cipher_data)
 
 IMPLEMENT_BLOCK_CIPHER(rc2, ks, RC2, EVP_RC2_KEY, NID_rc2,
                        8,
@@ -198,9 +199,7 @@ static int rc2_set_asn1_type_and_iv(EVP_CIPHER_CTX *c, ASN1_TYPE *type)
     if (type != NULL) {
         num = rc2_meth_to_magic(c);
         j = EVP_CIPHER_CTX_iv_length(c);
-        i = ASN1_TYPE_set_int_octetstring(type, num,
-                                          (unsigned char *)EVP_CIPHER_CTX_original_iv(c),
-                                          j);
+        i = ASN1_TYPE_set_int_octetstring(type, num, c->oiv, j);
     }
     return (i);
 }

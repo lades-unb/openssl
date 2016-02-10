@@ -1,3 +1,4 @@
+/* crypto/evp/e_des.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,11 +57,11 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #ifndef OPENSSL_NO_DES
 # include <openssl/evp.h>
 # include <openssl/objects.h>
-# include "internal/evp_int.h"
+# include "evp_locl.h"
 # include <openssl/des.h>
 # include <openssl/rand.h>
 
@@ -104,8 +105,7 @@ static int des_ecb_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 {
     BLOCK_CIPHER_ecb_loop()
         DES_ecb_encrypt((DES_cblock *)(in + i), (DES_cblock *)(out + i),
-                        EVP_CIPHER_CTX_cipher_data(ctx),
-                        EVP_CIPHER_CTX_encrypting(ctx));
+                        ctx->cipher_data, ctx->encrypt);
     return 1;
 }
 
@@ -113,43 +113,37 @@ static int des_ofb_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
                           const unsigned char *in, size_t inl)
 {
     while (inl >= EVP_MAXCHUNK) {
-        int num = EVP_CIPHER_CTX_num(ctx);
-        DES_ofb64_encrypt(in, out, (long)EVP_MAXCHUNK,
-                          EVP_CIPHER_CTX_cipher_data(ctx),
-                          (DES_cblock *)EVP_CIPHER_CTX_iv_noconst(ctx), &num);
-        EVP_CIPHER_CTX_set_num(ctx, num);
+        DES_ofb64_encrypt(in, out, (long)EVP_MAXCHUNK, ctx->cipher_data,
+                          (DES_cblock *)ctx->iv, &ctx->num);
         inl -= EVP_MAXCHUNK;
         in += EVP_MAXCHUNK;
         out += EVP_MAXCHUNK;
     }
-    if (inl) {
-        int num = EVP_CIPHER_CTX_num(ctx);
-        DES_ofb64_encrypt(in, out, (long)inl, EVP_CIPHER_CTX_cipher_data(ctx),
-                          (DES_cblock *)EVP_CIPHER_CTX_iv_noconst(ctx), &num);
-        EVP_CIPHER_CTX_set_num(ctx, num);
-    }
+    if (inl)
+        DES_ofb64_encrypt(in, out, (long)inl, ctx->cipher_data,
+                          (DES_cblock *)ctx->iv, &ctx->num);
     return 1;
 }
 
 static int des_cbc_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
                           const unsigned char *in, size_t inl)
 {
-    EVP_DES_KEY *dat = (EVP_DES_KEY *) EVP_CIPHER_CTX_cipher_data(ctx);
+    EVP_DES_KEY *dat = (EVP_DES_KEY *) ctx->cipher_data;
 
     if (dat->stream.cbc) {
-        (*dat->stream.cbc) (in, out, inl, &dat->ks.ks, EVP_CIPHER_CTX_iv_noconst(ctx));
+        (*dat->stream.cbc) (in, out, inl, &dat->ks.ks, ctx->iv);
         return 1;
     }
     while (inl >= EVP_MAXCHUNK) {
-        DES_ncbc_encrypt(in, out, (long)EVP_MAXCHUNK, EVP_CIPHER_CTX_cipher_data(ctx),
-                         (DES_cblock *)EVP_CIPHER_CTX_iv_noconst(ctx), EVP_CIPHER_CTX_encrypting(ctx));
+        DES_ncbc_encrypt(in, out, (long)EVP_MAXCHUNK, ctx->cipher_data,
+                         (DES_cblock *)ctx->iv, ctx->encrypt);
         inl -= EVP_MAXCHUNK;
         in += EVP_MAXCHUNK;
         out += EVP_MAXCHUNK;
     }
     if (inl)
-        DES_ncbc_encrypt(in, out, (long)inl, EVP_CIPHER_CTX_cipher_data(ctx),
-                         (DES_cblock *)EVP_CIPHER_CTX_iv_noconst(ctx), EVP_CIPHER_CTX_encrypting(ctx));
+        DES_ncbc_encrypt(in, out, (long)inl, ctx->cipher_data,
+                         (DES_cblock *)ctx->iv, ctx->encrypt);
     return 1;
 }
 
@@ -157,23 +151,15 @@ static int des_cfb64_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
                             const unsigned char *in, size_t inl)
 {
     while (inl >= EVP_MAXCHUNK) {
-        int num = EVP_CIPHER_CTX_num(ctx);
-        DES_cfb64_encrypt(in, out, (long)EVP_MAXCHUNK,
-                          EVP_CIPHER_CTX_cipher_data(ctx),
-                          (DES_cblock *)EVP_CIPHER_CTX_iv_noconst(ctx), &num,
-                          EVP_CIPHER_CTX_encrypting(ctx));
-        EVP_CIPHER_CTX_set_num(ctx, num);
+        DES_cfb64_encrypt(in, out, (long)EVP_MAXCHUNK, ctx->cipher_data,
+                          (DES_cblock *)ctx->iv, &ctx->num, ctx->encrypt);
         inl -= EVP_MAXCHUNK;
         in += EVP_MAXCHUNK;
         out += EVP_MAXCHUNK;
     }
-    if (inl) {
-        int num = EVP_CIPHER_CTX_num(ctx);
-        DES_cfb64_encrypt(in, out, (long)inl, EVP_CIPHER_CTX_cipher_data(ctx),
-                          (DES_cblock *)EVP_CIPHER_CTX_iv_noconst(ctx), &num,
-                          EVP_CIPHER_CTX_encrypting(ctx));
-        EVP_CIPHER_CTX_set_num(ctx, num);
-    }
+    if (inl)
+        DES_cfb64_encrypt(in, out, (long)inl, ctx->cipher_data,
+                          (DES_cblock *)ctx->iv, &ctx->num, ctx->encrypt);
     return 1;
 }
 
@@ -193,8 +179,8 @@ static int des_cfb1_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
     while (inl && inl >= chunk) {
         for (n = 0; n < chunk * 8; ++n) {
             c[0] = (in[n / 8] & (1 << (7 - n % 8))) ? 0x80 : 0;
-            DES_cfb_encrypt(c, d, 1, 1, EVP_CIPHER_CTX_cipher_data(ctx),
-                            (DES_cblock *)EVP_CIPHER_CTX_iv_noconst(ctx), EVP_CIPHER_CTX_encrypting(ctx));
+            DES_cfb_encrypt(c, d, 1, 1, ctx->cipher_data,
+                            (DES_cblock *)ctx->iv, ctx->encrypt);
             out[n / 8] =
                 (out[n / 8] & ~(0x80 >> (unsigned int)(n % 8))) |
                 ((d[0] & 0x80) >> (unsigned int)(n % 8));
@@ -213,15 +199,15 @@ static int des_cfb8_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
                            const unsigned char *in, size_t inl)
 {
     while (inl >= EVP_MAXCHUNK) {
-        DES_cfb_encrypt(in, out, 8, (long)EVP_MAXCHUNK, EVP_CIPHER_CTX_cipher_data(ctx),
-                        (DES_cblock *)EVP_CIPHER_CTX_iv_noconst(ctx), EVP_CIPHER_CTX_encrypting(ctx));
+        DES_cfb_encrypt(in, out, 8, (long)EVP_MAXCHUNK, ctx->cipher_data,
+                        (DES_cblock *)ctx->iv, ctx->encrypt);
         inl -= EVP_MAXCHUNK;
         in += EVP_MAXCHUNK;
         out += EVP_MAXCHUNK;
     }
     if (inl)
-        DES_cfb_encrypt(in, out, 8, (long)inl, EVP_CIPHER_CTX_cipher_data(ctx),
-                        (DES_cblock *)EVP_CIPHER_CTX_iv_noconst(ctx), EVP_CIPHER_CTX_encrypting(ctx));
+        DES_cfb_encrypt(in, out, 8, (long)inl, ctx->cipher_data,
+                        (DES_cblock *)ctx->iv, ctx->encrypt);
     return 1;
 }
 
@@ -241,12 +227,12 @@ static int des_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
                         const unsigned char *iv, int enc)
 {
     DES_cblock *deskey = (DES_cblock *)key;
-    EVP_DES_KEY *dat = (EVP_DES_KEY *) EVP_CIPHER_CTX_cipher_data(ctx);
+    EVP_DES_KEY *dat = (EVP_DES_KEY *) ctx->cipher_data;
 
     dat->stream.cbc = NULL;
 # if defined(SPARC_DES_CAPABLE)
     if (SPARC_DES_CAPABLE) {
-        int mode = EVP_CIPHER_CTX_mode(ctx);
+        int mode = ctx->cipher->flags & EVP_CIPH_MODE;
 
         if (mode == EVP_CIPH_CBC_MODE) {
             des_t4_key_expand(key, &dat->ks.ks);
@@ -255,7 +241,12 @@ static int des_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
         }
     }
 # endif
-    DES_set_key_unchecked(deskey, EVP_CIPHER_CTX_cipher_data(ctx));
+# ifdef EVP_CHECK_DES_KEY
+    if (DES_set_key_checked(deskey, dat->ks.ks) != 0)
+        return 0;
+# else
+    DES_set_key_unchecked(deskey, ctx->cipher_data);
+# endif
     return 1;
 }
 

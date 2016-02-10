@@ -1,3 +1,4 @@
+/* v3_prn.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -58,13 +59,13 @@
 /* X509 v3 extension utilities */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
 
 /* Extension printing routines */
 
-static int unknown_ext_print(BIO *out, const unsigned char *ext, int extlen,
+static int unknown_ext_print(BIO *out, X509_EXTENSION *ext,
                              unsigned long flag, int indent, int supported);
 
 /* Print out a name+value stack */
@@ -100,7 +101,7 @@ void X509V3_EXT_val_prn(BIO *out, STACK_OF(CONF_VALUE) *val, int indent,
             char *tmp;
             len = strlen(nval->value) + 1;
             tmp = OPENSSL_malloc(len);
-            if (tmp != NULL) {
+            if (tmp) {
                 ascii2ebcdic(tmp, nval->value, len);
                 BIO_printf(out, "%s:%s", nval->name, tmp);
                 OPENSSL_free(tmp);
@@ -119,29 +120,26 @@ int X509V3_EXT_print(BIO *out, X509_EXTENSION *ext, unsigned long flag,
 {
     void *ext_str = NULL;
     char *value = NULL;
-    ASN1_OCTET_STRING *extoct;
     const unsigned char *p;
-    int extlen;
     const X509V3_EXT_METHOD *method;
     STACK_OF(CONF_VALUE) *nval = NULL;
     int ok = 1;
 
-    extoct = X509_EXTENSION_get_data(ext);
-    p = ASN1_STRING_data(extoct);
-    extlen = ASN1_STRING_length(extoct);
-
-    if ((method = X509V3_EXT_get(ext)) == NULL)
-        return unknown_ext_print(out, p, extlen, flag, indent, 0);
+    if (!(method = X509V3_EXT_get(ext)))
+        return unknown_ext_print(out, ext, flag, indent, 0);
+    p = ext->value->data;
     if (method->it)
-        ext_str = ASN1_item_d2i(NULL, &p, extlen, ASN1_ITEM_ptr(method->it));
+        ext_str =
+            ASN1_item_d2i(NULL, &p, ext->value->length,
+                          ASN1_ITEM_ptr(method->it));
     else
-        ext_str = method->d2i(NULL, &p, extlen);
+        ext_str = method->d2i(NULL, &p, ext->value->length);
 
     if (!ext_str)
-        return unknown_ext_print(out, p, extlen, flag, indent, 1);
+        return unknown_ext_print(out, ext, flag, indent, 1);
 
     if (method->i2s) {
-        if ((value = method->i2s(method, ext_str)) == NULL) {
+        if (!(value = method->i2s(method, ext_str))) {
             ok = 0;
             goto err;
         }
@@ -153,7 +151,7 @@ int X509V3_EXT_print(BIO *out, X509_EXTENSION *ext, unsigned long flag,
             char *tmp;
             len = strlen(value) + 1;
             tmp = OPENSSL_malloc(len);
-            if (tmp != NULL) {
+            if (tmp) {
                 ascii2ebcdic(tmp, value, len);
                 BIO_printf(out, "%*s%s", indent, "", tmp);
                 OPENSSL_free(tmp);
@@ -161,7 +159,7 @@ int X509V3_EXT_print(BIO *out, X509_EXTENSION *ext, unsigned long flag,
         }
 #endif
     } else if (method->i2v) {
-        if ((nval = method->i2v(method, ext_str, NULL)) == NULL) {
+        if (!(nval = method->i2v(method, ext_str, NULL))) {
             ok = 0;
             goto err;
         }
@@ -175,7 +173,8 @@ int X509V3_EXT_print(BIO *out, X509_EXTENSION *ext, unsigned long flag,
 
  err:
     sk_CONF_VALUE_pop_free(nval, X509V3_conf_free);
-    OPENSSL_free(value);
+    if (value)
+        OPENSSL_free(value);
     if (method->it)
         ASN1_item_free(ext_str, ASN1_ITEM_ptr(method->it));
     else
@@ -210,7 +209,7 @@ int X509V3_extensions_print(BIO *bp, char *title,
             return 0;
         if (!X509V3_EXT_print(bp, ex, flag, indent + 4)) {
             BIO_printf(bp, "%*s", indent + 4, "");
-            ASN1_STRING_print(bp, X509_EXTENSION_get_data(ex));
+            M_ASN1_OCTET_STRING_print(bp, ex->value);
         }
         if (BIO_write(bp, "\n", 1) <= 0)
             return 0;
@@ -218,7 +217,7 @@ int X509V3_extensions_print(BIO *bp, char *title,
     return 1;
 }
 
-static int unknown_ext_print(BIO *out, const unsigned char *ext, int extlen,
+static int unknown_ext_print(BIO *out, X509_EXTENSION *ext,
                              unsigned long flag, int indent, int supported)
 {
     switch (flag & X509V3_EXT_UNKNOWN_MASK) {
@@ -234,22 +233,24 @@ static int unknown_ext_print(BIO *out, const unsigned char *ext, int extlen,
         return 1;
 
     case X509V3_EXT_PARSE_UNKNOWN:
-        return ASN1_parse_dump(out, ext, extlen, indent, -1);
+        return ASN1_parse_dump(out,
+                               ext->value->data, ext->value->length, indent,
+                               -1);
     case X509V3_EXT_DUMP_UNKNOWN:
-        return BIO_dump_indent(out, (char *)ext, extlen, indent);
+        return BIO_dump_indent(out, (char *)ext->value->data,
+                               ext->value->length, indent);
 
     default:
         return 1;
     }
 }
 
-#ifndef OPENSSL_NO_STDIO
+#ifndef OPENSSL_NO_FP_API
 int X509V3_EXT_print_fp(FILE *fp, X509_EXTENSION *ext, int flag, int indent)
 {
     BIO *bio_tmp;
     int ret;
-
-    if ((bio_tmp = BIO_new_fp(fp, BIO_NOCLOSE)) == NULL)
+    if (!(bio_tmp = BIO_new_fp(fp, BIO_NOCLOSE)))
         return 0;
     ret = X509V3_EXT_print(bio_tmp, ext, flag, indent);
     BIO_free(bio_tmp);

@@ -1,3 +1,4 @@
+/* crypto/engine/eng_ctrl.c */
 /* ====================================================================
  * Copyright (c) 1999-2001 The OpenSSL Project.  All rights reserved.
  *
@@ -133,7 +134,7 @@ static int int_ctrl_helper(ENGINE *e, int cmd, long i, void *p,
         return e->cmd_defns[idx].cmd_num;
     }
     /*
-     * For the rest of the commands, the 'long' argument must specify a valid
+     * For the rest of the commands, the 'long' argument must specify a valie
      * command number - so we need to conduct a search.
      */
     if ((e->cmd_defns == NULL) || ((idx = int_ctrl_cmd_by_num(e->cmd_defns,

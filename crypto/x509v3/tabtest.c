@@ -1,3 +1,4 @@
+/* tabtest.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -71,7 +72,7 @@ main()
 {
     int i, prev = -1, bad = 0;
     X509V3_EXT_METHOD **tmp;
-    i = OSSL_NELEM(standard_exts);
+    i = sizeof(standard_exts) / sizeof(X509V3_EXT_METHOD *);
     if (i != STANDARD_EXTENSION_COUNT)
         fprintf(stderr, "Extension number invalid expecting %d\n", i);
     tmp = standard_exts;

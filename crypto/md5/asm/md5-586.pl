@@ -56,14 +56,14 @@ sub R0
 	&lea($a,&DWP($t,$a,$tmp2,1));
 
 	&xor($tmp1,$d); # F function - part 4
-	&mov($tmp2,&DWP($xo[$ki+1]*4,$K,"",0)) if ($pos != 2);
 
 	&add($a,$tmp1);
+	&mov($tmp1,&Np($c)) if $pos < 1;	# next tmp1 for R0
+	&mov($tmp1,&Np($c)) if $pos == 1;	# next tmp1 for R1
 
 	&rotl($a,$s);
 
-	&mov($tmp1,&Np($c)) if $pos < 1;	# next tmp1 for R0
-	&mov($tmp1,&Np($c)) if $pos == 1;	# next tmp1 for R1
+	&mov($tmp2,&DWP($xo[$ki+1]*4,$K,"",0)) if ($pos != 2);
 
 	&add($a,$b);
 	}
@@ -74,12 +74,13 @@ sub R1
 
 	&comment("R1 $ki");
 
-	&xor($tmp1,$b); # G function - part 2
-	&and($tmp1,$d); # G function - part 3
 	&lea($a,&DWP($t,$a,$tmp2,1));
 
-	&xor($tmp1,$c);			# G function - part 4
+	&xor($tmp1,$b); # G function - part 2
+	&and($tmp1,$d); # G function - part 3
+
 	&mov($tmp2,&DWP($xo[$ki+1]*4,$K,"",0)) if ($pos != 2);
+	&xor($tmp1,$c);			# G function - part 4
 
 	&add($a,$tmp1);
 	&mov($tmp1,&Np($c)) if $pos < 1;	# G function - part 1
@@ -107,10 +108,10 @@ if (($n & 1) == 0)
 	&lea($a,&DWP($t,$a,$tmp2,1));
 
 	&add($a,$tmp1);
-	&mov($tmp2,&DWP($xo[$ki+1]*4,$K,"",0));
 
 	&rotl($a,$s);
 
+	&mov($tmp2,&DWP($xo[$ki+1]*4,$K,"",0));
 	&mov($tmp1,&Np($c));
 	}
 else
@@ -119,10 +120,10 @@ else
 	# make sure to do 'D' first, not 'B', else we clash with
 	# the last add from the previous round.
 
+	&lea($a,&DWP($t,$a,$tmp2,1));
+
 	&add($b,$c);			# MOVED FORWARD
 	&xor($tmp1,$d); # H function - part 2
-
-	&lea($a,&DWP($t,$a,$tmp2,1));
 
 	&xor($tmp1,$b); # H function - part 3
 	&mov($tmp2,&DWP($xo[$ki+1]*4,$K,"",0)) if ($pos != 2);

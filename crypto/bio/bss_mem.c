@@ -1,3 +1,4 @@
+/* crypto/bio/bss_mem.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -57,7 +58,7 @@
 
 #include <stdio.h>
 #include <errno.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/bio.h>
 
 static int mem_write(BIO *h, const char *buf, int num);
@@ -66,7 +67,6 @@ static int mem_puts(BIO *h, const char *str);
 static int mem_gets(BIO *h, char *str, int size);
 static long mem_ctrl(BIO *h, int cmd, long arg1, void *arg2);
 static int mem_new(BIO *h);
-static int secmem_new(BIO *h);
 static int mem_free(BIO *data);
 static BIO_METHOD mem_method = {
     BIO_TYPE_MEM,
@@ -77,18 +77,6 @@ static BIO_METHOD mem_method = {
     mem_gets,
     mem_ctrl,
     mem_new,
-    mem_free,
-    NULL,
-};
-static BIO_METHOD secmem_method = {
-    BIO_TYPE_MEM,
-    "secure memory buffer",
-    mem_write,
-    mem_read,
-    mem_puts,
-    mem_gets,
-    mem_ctrl,
-    secmem_new,
     mem_free,
     NULL,
 };
@@ -103,27 +91,21 @@ BIO_METHOD *BIO_s_mem(void)
     return (&mem_method);
 }
 
-BIO_METHOD *BIO_s_secmem(void)
-{
-    return(&secmem_method);
-}
-
-BIO *BIO_new_mem_buf(const void *buf, int len)
+BIO *BIO_new_mem_buf(void *buf, int len)
 {
     BIO *ret;
     BUF_MEM *b;
     size_t sz;
 
-    if (buf == NULL) {
+    if (!buf) {
         BIOerr(BIO_F_BIO_NEW_MEM_BUF, BIO_R_NULL_PARAMETER);
         return NULL;
     }
     sz = (len < 0) ? strlen(buf) : (size_t)len;
-    if ((ret = BIO_new(BIO_s_mem())) == NULL)
+    if (!(ret = BIO_new(BIO_s_mem())))
         return NULL;
     b = (BUF_MEM *)ret->ptr;
-    /* Cast away const and trust in the MEM_RDONLY flag. */
-    b->data = (void *)buf;
+    b->data = buf;
     b->length = sz;
     b->max = sz;
     ret->flags |= BIO_FLAGS_MEM_RDONLY;
@@ -132,27 +114,17 @@ BIO *BIO_new_mem_buf(const void *buf, int len)
     return ret;
 }
 
-static int mem_init(BIO *bi, unsigned long flags)
+static int mem_new(BIO *bi)
 {
     BUF_MEM *b;
 
-    if ((b = BUF_MEM_new_ex(flags)) == NULL)
-        return(0);
+    if ((b = BUF_MEM_new()) == NULL)
+        return (0);
     bi->shutdown = 1;
     bi->init = 1;
     bi->num = -1;
     bi->ptr = (char *)b;
-    return(1);
-}
-
-static int mem_new(BIO *bi)
-{
-    return (mem_init(bi, 0L));
-}
-
-static int secmem_new(BIO *bi)
-{
-    return (mem_init(bi, BUF_MEM_FLAG_SECURE));
+    return (1);
 }
 
 static int mem_free(BIO *a)
@@ -172,6 +144,12 @@ static int mem_free(BIO *a)
     return (1);
 }
 
+
+//
+// This function mem_read reads outl bytes from the memory BIO "b".
+// If the flag BIO_FLAGS_MEM_RDONLY is not set it also removes 
+// the bytes read from the memory BIO buffer. 
+//
 static int mem_read(BIO *b, char *out, int outl)
 {
     int ret = -1;
@@ -215,7 +193,7 @@ static int mem_write(BIO *b, const char *in, int inl)
 
     BIO_clear_retry_flags(b);
     blen = bm->length;
-    if (BUF_MEM_grow_clean(bm, blen + inl) == 0)
+    if (BUF_MEM_grow_clean(bm, blen + inl) != (blen + inl))
         goto end;
     memcpy(&(bm->data[blen]), in, inl);
     ret = inl;

@@ -12,6 +12,21 @@
  * appears to lead to invalid ELF files being produced.
  */
 
+#include <openssl/bn.h>
+
+#define P256_LIMBS      (256/BN_BITS2)
+
+struct p256_point_afine_st {
+    BN_ULONG X[P256_LIMBS];
+    BN_ULONG Y[P256_LIMBS];
+};
+
+#if BN_BITS2 != 64
+# define TOBN(hi,lo)    lo,hi
+#else
+# define TOBN(hi,lo)    ((BN_ULONG)hi<<32|lo)
+#endif
+
 #if defined(__GNUC__)
 __attribute((aligned(4096)))
 #elif defined(_MSC_VER)
@@ -19,8 +34,10 @@ __declspec(align(4096))
 #elif defined(__SUNPRO_C)
 # pragma align 4096(ecp_nistz256_precomputed)
 #endif
+
+
 static const BN_ULONG ecp_nistz256_precomputed[37][64 *
-                                                   sizeof(P256_POINT_AFFINE) /
+                                                   sizeof(struct p256_point_afine_st) /
                                                    sizeof(BN_ULONG)] = {
     {TOBN(0x79e730d4, 0x18a9143c), TOBN(0x75ba95fc, 0x5fedb601),
      TOBN(0x79fb732b, 0x77622510), TOBN(0x18905f76, 0xa53755c6),

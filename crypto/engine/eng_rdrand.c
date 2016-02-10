@@ -120,7 +120,7 @@ static int bind_helper(ENGINE *e)
 static ENGINE *ENGINE_rdrand(void)
 {
     ENGINE *ret = ENGINE_new();
-    if (ret == NULL)
+    if (!ret)
         return NULL;
     if (!bind_helper(ret)) {
         ENGINE_free(ret);

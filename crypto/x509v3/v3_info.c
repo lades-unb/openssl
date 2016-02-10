@@ -1,3 +1,4 @@
+/* v3_info.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,12 +58,11 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/conf.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/x509v3.h>
-#include "ext_dat.h"
 
 static STACK_OF(CONF_VALUE) *i2v_AUTHORITY_INFO_ACCESS(X509V3_EXT_METHOD
                                                        *method, AUTHORITY_INFO_ACCESS
@@ -125,14 +125,14 @@ static STACK_OF(CONF_VALUE) *i2v_AUTHORITY_INFO_ACCESS(X509V3_EXT_METHOD
         i2t_ASN1_OBJECT(objtmp, sizeof objtmp, desc->method);
         nlen = strlen(objtmp) + strlen(vtmp->name) + 5;
         ntmp = OPENSSL_malloc(nlen);
-        if (ntmp == NULL) {
+        if (!ntmp) {
             X509V3err(X509V3_F_I2V_AUTHORITY_INFO_ACCESS,
                       ERR_R_MALLOC_FAILURE);
             return NULL;
         }
-        OPENSSL_strlcpy(ntmp, objtmp, nlen);
-        OPENSSL_strlcat(ntmp, " - ", nlen);
-        OPENSSL_strlcat(ntmp, vtmp->name, nlen);
+        BUF_strlcpy(ntmp, objtmp, nlen);
+        BUF_strlcat(ntmp, " - ", nlen);
+        BUF_strlcat(ntmp, vtmp->name, nlen);
         OPENSSL_free(vtmp->name);
         vtmp->name = ntmp;
 
@@ -153,14 +153,13 @@ static AUTHORITY_INFO_ACCESS *v2i_AUTHORITY_INFO_ACCESS(X509V3_EXT_METHOD
     ACCESS_DESCRIPTION *acc;
     int i, objlen;
     char *objtmp, *ptmp;
-
-    if ((ainfo = sk_ACCESS_DESCRIPTION_new_null()) == NULL) {
+    if (!(ainfo = sk_ACCESS_DESCRIPTION_new_null())) {
         X509V3err(X509V3_F_V2I_AUTHORITY_INFO_ACCESS, ERR_R_MALLOC_FAILURE);
         return NULL;
     }
     for (i = 0; i < sk_CONF_VALUE_num(nval); i++) {
         cnf = sk_CONF_VALUE_value(nval, i);
-        if ((acc = ACCESS_DESCRIPTION_new()) == NULL
+        if (!(acc = ACCESS_DESCRIPTION_new())
             || !sk_ACCESS_DESCRIPTION_push(ainfo, acc)) {
             X509V3err(X509V3_F_V2I_AUTHORITY_INFO_ACCESS,
                       ERR_R_MALLOC_FAILURE);
@@ -177,7 +176,7 @@ static AUTHORITY_INFO_ACCESS *v2i_AUTHORITY_INFO_ACCESS(X509V3_EXT_METHOD
         ctmp.value = cnf->value;
         if (!v2i_GENERAL_NAME_ex(acc->location, method, ctx, &ctmp, 0))
             goto err;
-        if ((objtmp = OPENSSL_malloc(objlen + 1)) == NULL) {
+        if (!(objtmp = OPENSSL_malloc(objlen + 1))) {
             X509V3err(X509V3_F_V2I_AUTHORITY_INFO_ACCESS,
                       ERR_R_MALLOC_FAILURE);
             goto err;
@@ -204,5 +203,8 @@ static AUTHORITY_INFO_ACCESS *v2i_AUTHORITY_INFO_ACCESS(X509V3_EXT_METHOD
 int i2a_ACCESS_DESCRIPTION(BIO *bp, ACCESS_DESCRIPTION *a)
 {
     i2a_ASN1_OBJECT(bp, a->method);
+#ifdef UNDEF
+    i2a_GENERAL_NAME(bp, a->location);
+#endif
     return 2;
 }

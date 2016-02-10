@@ -1,4 +1,5 @@
-#include <openssl/jpake.h>
+#include "jpake.h"
+
 #include <openssl/crypto.h>
 #include <openssl/sha.h>
 #include <openssl/err.h>
@@ -107,16 +108,14 @@ static void JPAKE_CTX_release(JPAKE_CTX *ctx)
     OPENSSL_free(ctx->p.peer_name);
     OPENSSL_free(ctx->p.name);
 
-    memset(ctx, 0, sizeof(*ctx));
+    memset(ctx, '\0', sizeof *ctx);
 }
 
 JPAKE_CTX *JPAKE_CTX_new(const char *name, const char *peer_name,
                          const BIGNUM *p, const BIGNUM *g, const BIGNUM *q,
                          const BIGNUM *secret)
 {
-    JPAKE_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
-    if (ctx == NULL)
-        return NULL;
+    JPAKE_CTX *ctx = OPENSSL_malloc(sizeof *ctx);
 
     JPAKE_CTX_init(ctx, name, peer_name, p, g, q, secret);
 
@@ -125,8 +124,6 @@ JPAKE_CTX *JPAKE_CTX_new(const char *name, const char *peer_name,
 
 void JPAKE_CTX_free(JPAKE_CTX *ctx)
 {
-    if (!ctx)
-        return;
     JPAKE_CTX_release(ctx);
     OPENSSL_free(ctx);
 }
@@ -149,24 +146,20 @@ static void hashstring(SHA_CTX *sha, const char *string)
     SHA1_Update(sha, string, l);
 }
 
-static int hashbn(SHA_CTX *sha, const BIGNUM *bn)
+static void hashbn(SHA_CTX *sha, const BIGNUM *bn)
 {
     size_t l = BN_num_bytes(bn);
     unsigned char *bin = OPENSSL_malloc(l);
-
-    if (bin == NULL)
-        return 0;
 
     hashlength(sha, l);
     BN_bn2bin(bn, bin);
     SHA1_Update(sha, bin, l);
     OPENSSL_free(bin);
-    return 1;
 }
 
 /* h=hash(g, g^r, g^x, name) */
-static int zkp_hash(BIGNUM *h, const BIGNUM *zkpg, const JPAKE_STEP_PART *p,
-                    const char *proof_name)
+static void zkp_hash(BIGNUM *h, const BIGNUM *zkpg, const JPAKE_STEP_PART *p,
+                     const char *proof_name)
 {
     unsigned char md[SHA_DIGEST_LENGTH];
     SHA_CTX sha;
@@ -176,33 +169,25 @@ static int zkp_hash(BIGNUM *h, const BIGNUM *zkpg, const JPAKE_STEP_PART *p,
      * is flawed in this respect. Length encoding seems simplest.
      */
     SHA1_Init(&sha);
-    if (!hashbn(&sha, zkpg))
-        return 0;
+    hashbn(&sha, zkpg);
     OPENSSL_assert(!BN_is_zero(p->zkpx.gr));
-    if (!hashbn(&sha, p->zkpx.gr))
-        return 0;
-    if (!hashbn(&sha, p->gx))
-        return 0;
+    hashbn(&sha, p->zkpx.gr);
+    hashbn(&sha, p->gx);
     hashstring(&sha, proof_name);
     SHA1_Final(md, &sha);
     BN_bin2bn(md, SHA_DIGEST_LENGTH, h);
-    return 1;
 }
 
 /*
  * Prove knowledge of x
  * Note that p->gx has already been calculated
  */
-static int generate_zkp(JPAKE_STEP_PART *p, const BIGNUM *x,
-                        const BIGNUM *zkpg, JPAKE_CTX *ctx)
+static void generate_zkp(JPAKE_STEP_PART *p, const BIGNUM *x,
+                         const BIGNUM *zkpg, JPAKE_CTX *ctx)
 {
-    int res = 0;
     BIGNUM *r = BN_new();
     BIGNUM *h = BN_new();
     BIGNUM *t = BN_new();
-
-    if (r == NULL || h == NULL || t == NULL)
-        goto end;
 
    /*-
     * r in [0,q)
@@ -213,20 +198,16 @@ static int generate_zkp(JPAKE_STEP_PART *p, const BIGNUM *x,
     BN_mod_exp(p->zkpx.gr, zkpg, r, ctx->p.p, ctx->ctx);
 
     /* h=hash... */
-    if (!zkp_hash(h, zkpg, p, ctx->p.name))
-        goto end;
+    zkp_hash(h, zkpg, p, ctx->p.name);
 
     /* b = r - x*h */
     BN_mod_mul(t, x, h, ctx->p.q, ctx->ctx);
     BN_mod_sub(p->zkpx.b, r, t, ctx->p.q, ctx->ctx);
 
-    res = 1;
- end:
     /* cleanup */
     BN_free(t);
     BN_free(h);
     BN_free(r);
-    return res;
 }
 
 static int verify_zkp(const JPAKE_STEP_PART *p, const BIGNUM *zkpg,
@@ -238,11 +219,7 @@ static int verify_zkp(const JPAKE_STEP_PART *p, const BIGNUM *zkpg,
     BIGNUM *t3 = BN_new();
     int ret = 0;
 
-    if (h == NULL || t1 == NULL || t2 == NULL || t3 == NULL)
-        goto end;
-
-    if (!zkp_hash(h, zkpg, p, ctx->p.peer_name))
-        goto end;
+    zkp_hash(h, zkpg, p, ctx->p.peer_name);
 
     /* t1 = g^b */
     BN_mod_exp(t1, zkpg, p->zkpx.b, ctx->p.p, ctx->ctx);
@@ -257,7 +234,6 @@ static int verify_zkp(const JPAKE_STEP_PART *p, const BIGNUM *zkpg,
     else
         JPAKEerr(JPAKE_F_VERIFY_ZKP, JPAKE_R_ZKP_VERIFY_FAILED);
 
- end:
     /* cleanup */
     BN_free(t3);
     BN_free(t2);
@@ -267,13 +243,11 @@ static int verify_zkp(const JPAKE_STEP_PART *p, const BIGNUM *zkpg,
     return ret;
 }
 
-static int generate_step_part(JPAKE_STEP_PART *p, const BIGNUM *x,
-                              const BIGNUM *g, JPAKE_CTX *ctx)
+static void generate_step_part(JPAKE_STEP_PART *p, const BIGNUM *x,
+                               const BIGNUM *g, JPAKE_CTX *ctx)
 {
     BN_mod_exp(p->gx, g, x, ctx->p.p, ctx->ctx);
-    if (!generate_zkp(p, x, g, ctx))
-        return 0;
-    return 1;
+    generate_zkp(p, x, g, ctx);
 }
 
 /* Generate each party's random numbers. xa is in [0, q), xb is in [1, q). */
@@ -301,10 +275,8 @@ static void genrand(JPAKE_CTX *ctx)
 int JPAKE_STEP1_generate(JPAKE_STEP1 *send, JPAKE_CTX *ctx)
 {
     genrand(ctx);
-    if (!generate_step_part(&send->p1, ctx->xa, ctx->p.g, ctx))
-        return 0;
-    if (!generate_step_part(&send->p2, ctx->xb, ctx->p.g, ctx))
-        return 0;
+    generate_step_part(&send->p1, ctx->xa, ctx->p.g, ctx);
+    generate_step_part(&send->p2, ctx->xb, ctx->p.g, ctx);
 
     return 1;
 }
@@ -367,8 +339,6 @@ int JPAKE_STEP1_process(JPAKE_CTX *ctx, const JPAKE_STEP1 *received)
 
 int JPAKE_STEP2_generate(JPAKE_STEP2 *send, JPAKE_CTX *ctx)
 {
-    int ret;
-
     BIGNUM *t1 = BN_new();
     BIGNUM *t2 = BN_new();
 
@@ -393,13 +363,13 @@ int JPAKE_STEP2_generate(JPAKE_STEP2 *send, JPAKE_CTX *ctx)
     * as the generator, which means X is g'^{xb * s}
     * X = t1^{t2} = t1^{xb * s} = g^{(xa + xc + xd) * xb * s}
     */
-    ret = generate_step_part(send, t2, t1, ctx);
+    generate_step_part(send, t2, t1, ctx);
 
     /* cleanup */
     BN_free(t1);
     BN_free(t2);
 
-    return ret;
+    return 1;
 }
 
 /* gx = g^{xc + xa + xb} * xd * s */
@@ -466,15 +436,13 @@ int JPAKE_STEP2_process(JPAKE_CTX *ctx, const JPAKE_STEP2 *received)
     return ret;
 }
 
-static int quickhashbn(unsigned char *md, const BIGNUM *bn)
+static void quickhashbn(unsigned char *md, const BIGNUM *bn)
 {
     SHA_CTX sha;
 
     SHA1_Init(&sha);
-    if (!hashbn(&sha, bn))
-        return 0;
+    hashbn(&sha, bn);
     SHA1_Final(md, &sha);
-    return 1;
 }
 
 void JPAKE_STEP3A_init(JPAKE_STEP3A *s3a)
@@ -483,8 +451,7 @@ void JPAKE_STEP3A_init(JPAKE_STEP3A *s3a)
 
 int JPAKE_STEP3A_generate(JPAKE_STEP3A *send, JPAKE_CTX *ctx)
 {
-    if (!quickhashbn(send->hhk, ctx->key))
-        return 0;
+    quickhashbn(send->hhk, ctx->key);
     SHA1(send->hhk, sizeof send->hhk, send->hhk);
 
     return 1;
@@ -494,8 +461,7 @@ int JPAKE_STEP3A_process(JPAKE_CTX *ctx, const JPAKE_STEP3A *received)
 {
     unsigned char hhk[SHA_DIGEST_LENGTH];
 
-    if (!quickhashbn(hhk, ctx->key))
-        return 0;
+    quickhashbn(hhk, ctx->key);
     SHA1(hhk, sizeof hhk, hhk);
     if (memcmp(hhk, received->hhk, sizeof hhk)) {
         JPAKEerr(JPAKE_F_JPAKE_STEP3A_PROCESS,
@@ -515,8 +481,8 @@ void JPAKE_STEP3B_init(JPAKE_STEP3B *s3b)
 
 int JPAKE_STEP3B_generate(JPAKE_STEP3B *send, JPAKE_CTX *ctx)
 {
-    if (!quickhashbn(send->hk, ctx->key))
-        return 0;
+    quickhashbn(send->hk, ctx->key);
+
     return 1;
 }
 
@@ -524,8 +490,7 @@ int JPAKE_STEP3B_process(JPAKE_CTX *ctx, const JPAKE_STEP3B *received)
 {
     unsigned char hk[SHA_DIGEST_LENGTH];
 
-    if (!quickhashbn(hk, ctx->key))
-        return 0;
+    quickhashbn(hk, ctx->key);
     if (memcmp(hk, received->hk, sizeof hk)) {
         JPAKEerr(JPAKE_F_JPAKE_STEP3B_PROCESS, JPAKE_R_HASH_OF_KEY_MISMATCH);
         return 0;

@@ -1,3 +1,4 @@
+/* crypto/pkcs7/pkcs7.h */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -99,7 +100,8 @@ typedef struct pkcs7_signer_info_st {
     EVP_PKEY *pkey;
 } PKCS7_SIGNER_INFO;
 
-DEFINE_STACK_OF(PKCS7_SIGNER_INFO)
+DECLARE_STACK_OF(PKCS7_SIGNER_INFO)
+DECLARE_ASN1_SET_OF(PKCS7_SIGNER_INFO)
 
 typedef struct pkcs7_recip_info_st {
     ASN1_INTEGER *version;      /* version 0 */
@@ -109,7 +111,8 @@ typedef struct pkcs7_recip_info_st {
     X509 *cert;                 /* get the pub-key from this */
 } PKCS7_RECIP_INFO;
 
-DEFINE_STACK_OF(PKCS7_RECIP_INFO)
+DECLARE_STACK_OF(PKCS7_RECIP_INFO)
+DECLARE_ASN1_SET_OF(PKCS7_RECIP_INFO)
 
 typedef struct pkcs7_signed_st {
     ASN1_INTEGER *version;      /* version 1 */
@@ -196,7 +199,9 @@ typedef struct pkcs7_st {
     } d;
 } PKCS7;
 
-DEFINE_STACK_OF(PKCS7)
+DECLARE_STACK_OF(PKCS7)
+DECLARE_ASN1_SET_OF(PKCS7)
+DECLARE_PKCS12_STACK_OF(PKCS7)
 
 # define PKCS7_OP_SET_DETACHED_SIGNATURE 1
 # define PKCS7_OP_GET_DETACHED_SIGNATURE 2
@@ -250,15 +255,12 @@ DEFINE_STACK_OF(PKCS7)
 # define SMIME_BINARY    PKCS7_BINARY
 # define SMIME_NOATTR    PKCS7_NOATTR
 
-/* CRLF ASCII canonicalisation */
-# define SMIME_ASCIICRLF         0x80000
-
 DECLARE_ASN1_FUNCTIONS(PKCS7_ISSUER_AND_SERIAL)
 
 int PKCS7_ISSUER_AND_SERIAL_digest(PKCS7_ISSUER_AND_SERIAL *data,
                                    const EVP_MD *type, unsigned char *md,
                                    unsigned int *len);
-# ifndef OPENSSL_NO_STDIO
+# ifndef OPENSSL_NO_FP_API
 PKCS7 *d2i_PKCS7_fp(FILE *fp, PKCS7 **p7);
 int i2d_PKCS7_fp(FILE *fp, PKCS7 *p7);
 # endif

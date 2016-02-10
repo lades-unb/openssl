@@ -1,3 +1,4 @@
+/* crypto/rsa/rsa_prn.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 2006.
@@ -57,11 +58,11 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/rsa.h>
 #include <openssl/evp.h>
 
-#ifndef OPENSSL_NO_STDIO
+#ifndef OPENSSL_NO_FP_API
 int RSA_print_fp(FILE *fp, const RSA *x, int off)
 {
     BIO *b;
@@ -83,7 +84,7 @@ int RSA_print(BIO *bp, const RSA *x, int off)
     EVP_PKEY *pk;
     int ret;
     pk = EVP_PKEY_new();
-    if (pk == NULL || !EVP_PKEY_set1_RSA(pk, (RSA *)x))
+    if (!pk || !EVP_PKEY_set1_RSA(pk, (RSA *)x))
         return 0;
     ret = EVP_PKEY_print_private(bp, pk, off, NULL);
     EVP_PKEY_free(pk);

@@ -1,3 +1,4 @@
+/* pcy_data.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 2004.
@@ -56,7 +57,7 @@
  *
  */
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
@@ -66,8 +67,6 @@
 
 void policy_data_free(X509_POLICY_DATA *data)
 {
-    if (!data)
-        return;
     ASN1_OBJECT_free(data->valid_policy);
     /* Don't free qualifiers if shared */
     if (!(data->flags & POLICY_DATA_FLAG_SHARED_QUALIFIERS))
@@ -97,18 +96,21 @@ X509_POLICY_DATA *policy_data_new(POLICYINFO *policy,
             return NULL;
     } else
         id = NULL;
-    ret = OPENSSL_zalloc(sizeof(*ret));
-    if (ret == NULL)
+    ret = OPENSSL_malloc(sizeof(X509_POLICY_DATA));
+    if (!ret)
         return NULL;
     ret->expected_policy_set = sk_ASN1_OBJECT_new_null();
-    if (ret->expected_policy_set == NULL) {
+    if (!ret->expected_policy_set) {
         OPENSSL_free(ret);
-        ASN1_OBJECT_free(id);
+        if (id)
+            ASN1_OBJECT_free(id);
         return NULL;
     }
 
     if (crit)
         ret->flags = POLICY_DATA_FLAG_CRITICAL;
+    else
+        ret->flags = 0;
 
     if (id)
         ret->valid_policy = id;
@@ -120,7 +122,8 @@ X509_POLICY_DATA *policy_data_new(POLICYINFO *policy,
     if (policy) {
         ret->qualifier_set = policy->qualifiers;
         policy->qualifiers = NULL;
-    }
+    } else
+        ret->qualifier_set = NULL;
 
     return ret;
 }

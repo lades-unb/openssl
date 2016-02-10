@@ -1,3 +1,4 @@
+/* dso_dl.c -*- mode:C; c-file-style: "eay" -*- */
 /*
  * Written by Richard Levitte (richard@levitte.org) for the OpenSSL project
  * 2000.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/dso.h>
 
 #ifndef DSO_DL
@@ -76,6 +77,13 @@ static int dl_load(DSO *dso);
 static int dl_unload(DSO *dso);
 static void *dl_bind_var(DSO *dso, const char *symname);
 static DSO_FUNC_TYPE dl_bind_func(DSO *dso, const char *symname);
+# if 0
+static int dl_unbind_var(DSO *dso, char *symname, void *symptr);
+static int dl_unbind_func(DSO *dso, char *symname, DSO_FUNC_TYPE symptr);
+static int dl_init(DSO *dso);
+static int dl_finish(DSO *dso);
+static int dl_ctrl(DSO *dso, int cmd, long larg, void *parg);
+# endif
 static char *dl_name_converter(DSO *dso, const char *filename);
 static char *dl_merger(DSO *dso, const char *filespec1,
                        const char *filespec2);
@@ -88,6 +96,11 @@ static DSO_METHOD dso_meth_dl = {
     dl_unload,
     dl_bind_var,
     dl_bind_func,
+/* For now, "unbind" doesn't exist */
+# if 0
+    NULL,                       /* unbind_var */
+    NULL,                       /* unbind_func */
+# endif
     NULL,                       /* ctrl */
     dl_name_converter,
     dl_merger,
@@ -114,7 +127,7 @@ static int dl_load(DSO *dso)
     /*
      * We don't do any fancy retries or anything, just take the method's (or
      * DSO's if it has the callback set) best translation of the
-     * platform-independent filename and try once with that.
+     * platform-independant filename and try once with that.
      */
     char *filename = DSO_convert_filename(dso, NULL);
 
@@ -142,7 +155,8 @@ static int dl_load(DSO *dso)
     return (1);
  err:
     /* Cleanup! */
-    OPENSSL_free(filename);
+    if (filename != NULL)
+        OPENSSL_free(filename);
     if (ptr != NULL)
         shl_unload(ptr);
     return (0);
@@ -236,21 +250,23 @@ static char *dl_merger(DSO *dso, const char *filespec1, const char *filespec2)
      * if the second file specification is missing.
      */
     if (!filespec2 || filespec1[0] == '/') {
-        merged = OPENSSL_strdup(filespec1);
-        if (merged == NULL) {
+        merged = OPENSSL_malloc(strlen(filespec1) + 1);
+        if (!merged) {
             DSOerr(DSO_F_DL_MERGER, ERR_R_MALLOC_FAILURE);
             return (NULL);
         }
+        strcpy(merged, filespec1);
     }
     /*
      * If the first file specification is missing, the second one rules.
      */
     else if (!filespec1) {
-        merged = OPENSSL_strdup(filespec2);
-        if (merged == NULL) {
+        merged = OPENSSL_malloc(strlen(filespec2) + 1);
+        if (!merged) {
             DSOerr(DSO_F_DL_MERGER, ERR_R_MALLOC_FAILURE);
             return (NULL);
         }
+        strcpy(merged, filespec2);
     } else
         /*
          * This part isn't as trivial as it looks.  It assumes that the
@@ -265,12 +281,12 @@ static char *dl_merger(DSO *dso, const char *filespec1, const char *filespec2)
         spec2len = (filespec2 ? strlen(filespec2) : 0);
         len = spec2len + (filespec1 ? strlen(filespec1) : 0);
 
-        if (spec2len && filespec2[spec2len - 1] == '/') {
+        if (filespec2 && filespec2[spec2len - 1] == '/') {
             spec2len--;
             len--;
         }
         merged = OPENSSL_malloc(len + 2);
-        if (merged == NULL) {
+        if (!merged) {
             DSOerr(DSO_F_DL_MERGER, ERR_R_MALLOC_FAILURE);
             return (NULL);
         }
@@ -286,7 +302,7 @@ static char *dl_merger(DSO *dso, const char *filespec1, const char *filespec2)
  * unlikely that both the "dl" *and* "dlfcn" variants are being compiled at
  * the same time, there's no great duplicating the code. Figuring out an
  * elegant way to share one copy of the code would be more difficult and
- * would not leave the implementations independent.
+ * would not leave the implementations independant.
  */
 # if defined(__hpux)
 static const char extension[] = ".sl";

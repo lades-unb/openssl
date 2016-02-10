@@ -1,3 +1,4 @@
+/* crypto/store/str_lib.c -*- mode:C; c-file-style: "eay" -*- */
 /*
  * Written by Richard Levitte (richard@levitte.org) for the OpenSSL project
  * 2003.
@@ -108,7 +109,7 @@ STORE *STORE_new_method(const STORE_METHOD *method)
         return NULL;
     }
 
-    ret = OPENSSL_malloc(sizeof(*ret));
+    ret = (STORE *)OPENSSL_malloc(sizeof(STORE));
     if (ret == NULL) {
         STOREerr(STORE_F_STORE_NEW_METHOD, ERR_R_MALLOC_FAILURE);
         return NULL;
@@ -186,6 +187,13 @@ int STORE_ctrl(STORE *store, int cmd, long i, void *p, void (*f) (void))
     return 0;
 }
 
+int STORE_get_ex_new_index(long argl, void *argp, CRYPTO_EX_new *new_func,
+                           CRYPTO_EX_dup *dup_func, CRYPTO_EX_free *free_func)
+{
+    return CRYPTO_get_ex_new_index(CRYPTO_EX_INDEX_STORE, argl, argp,
+                                   new_func, dup_func, free_func);
+}
+
 int STORE_set_ex_data(STORE *r, int idx, void *arg)
 {
     return (CRYPTO_set_ex_data(&r->ex_data, idx, arg));
@@ -243,7 +251,8 @@ X509 *STORE_get_certificate(STORE *s, OPENSSL_ITEM attributes[],
                  STORE_R_FAILED_GETTING_CERTIFICATE);
         return 0;
     }
-    X509_up_ref(object->data.x509.certificate);
+    CRYPTO_add(&object->data.x509.certificate->references, 1,
+               CRYPTO_LOCK_X509);
 #ifdef REF_PRINT
     REF_PRINT("X509", data);
 #endif
@@ -258,16 +267,16 @@ int STORE_store_certificate(STORE *s, X509 *data, OPENSSL_ITEM attributes[],
     STORE_OBJECT *object;
     int i;
 
-    check_store(s, STORE_F_STORE_STORE_CERTIFICATE,
+    check_store(s, STORE_F_STORE_CERTIFICATE,
                 store_object, STORE_R_NO_STORE_OBJECT_FUNCTION);
 
     object = STORE_OBJECT_new();
-    if (object == NULL) {
+    if (!object) {
         STOREerr(STORE_F_STORE_STORE_CERTIFICATE, ERR_R_MALLOC_FAILURE);
         return 0;
     }
 
-    X509_up_ref(data);
+    CRYPTO_add(&data->references, 1, CRYPTO_LOCK_X509);
 #ifdef REF_PRINT
     REF_PRINT("X509", data);
 #endif
@@ -369,7 +378,8 @@ X509 *STORE_list_certificate_next(STORE *s, void *handle)
                  STORE_R_FAILED_LISTING_CERTIFICATES);
         return 0;
     }
-    X509_up_ref(object->data.x509.certificate);
+    CRYPTO_add(&object->data.x509.certificate->references, 1,
+               CRYPTO_LOCK_X509);
 #ifdef REF_PRINT
     REF_PRINT("X509", data);
 #endif
@@ -419,7 +429,7 @@ EVP_PKEY *STORE_generate_key(STORE *s, OPENSSL_ITEM attributes[],
         STOREerr(STORE_F_STORE_GENERATE_KEY, STORE_R_FAILED_GENERATING_KEY);
         return 0;
     }
-    EVP_PKEY_up_ref(object->data.key);
+    CRYPTO_add(&object->data.key->references, 1, CRYPTO_LOCK_EVP_PKEY);
 #ifdef REF_PRINT
     REF_PRINT("EVP_PKEY", data);
 #endif
@@ -443,7 +453,7 @@ EVP_PKEY *STORE_get_private_key(STORE *s, OPENSSL_ITEM attributes[],
         STOREerr(STORE_F_STORE_GET_PRIVATE_KEY, STORE_R_FAILED_GETTING_KEY);
         return 0;
     }
-    EVP_PKEY_up_ref(object->data.key);
+    CRYPTO_add(&object->data.key->references, 1, CRYPTO_LOCK_EVP_PKEY);
 #ifdef REF_PRINT
     REF_PRINT("EVP_PKEY", data);
 #endif
@@ -463,17 +473,17 @@ int STORE_store_private_key(STORE *s, EVP_PKEY *data,
                 store_object, STORE_R_NO_STORE_OBJECT_FUNCTION);
 
     object = STORE_OBJECT_new();
-    if (object == NULL) {
+    if (!object) {
         STOREerr(STORE_F_STORE_STORE_PRIVATE_KEY, ERR_R_MALLOC_FAILURE);
         return 0;
     }
     object->data.key = EVP_PKEY_new();
-    if (object->data.key == NULL) {
+    if (!object->data.key) {
         STOREerr(STORE_F_STORE_STORE_PRIVATE_KEY, ERR_R_MALLOC_FAILURE);
         return 0;
     }
 
-    EVP_PKEY_up_ref(data);
+    CRYPTO_add(&data->references, 1, CRYPTO_LOCK_EVP_PKEY);
 #ifdef REF_PRINT
     REF_PRINT("EVP_PKEY", data);
 #endif
@@ -577,7 +587,7 @@ EVP_PKEY *STORE_list_private_key_next(STORE *s, void *handle)
                  STORE_R_FAILED_LISTING_KEYS);
         return 0;
     }
-    EVP_PKEY_up_ref(object->data.key);
+    CRYPTO_add(&object->data.key->references, 1, CRYPTO_LOCK_EVP_PKEY);
 #ifdef REF_PRINT
     REF_PRINT("EVP_PKEY", data);
 #endif
@@ -627,7 +637,7 @@ EVP_PKEY *STORE_get_public_key(STORE *s, OPENSSL_ITEM attributes[],
         STOREerr(STORE_F_STORE_GET_PUBLIC_KEY, STORE_R_FAILED_GETTING_KEY);
         return 0;
     }
-    EVP_PKEY_up_ref(object->data.key);
+    CRYPTO_add(&object->data.key->references, 1, CRYPTO_LOCK_EVP_PKEY);
 #ifdef REF_PRINT
     REF_PRINT("EVP_PKEY", data);
 #endif
@@ -647,17 +657,17 @@ int STORE_store_public_key(STORE *s, EVP_PKEY *data,
                 store_object, STORE_R_NO_STORE_OBJECT_FUNCTION);
 
     object = STORE_OBJECT_new();
-    if (object == NULL) {
+    if (!object) {
         STOREerr(STORE_F_STORE_STORE_PUBLIC_KEY, ERR_R_MALLOC_FAILURE);
         return 0;
     }
     object->data.key = EVP_PKEY_new();
-    if (object->data.key == NULL) {
+    if (!object->data.key) {
         STOREerr(STORE_F_STORE_STORE_PUBLIC_KEY, ERR_R_MALLOC_FAILURE);
         return 0;
     }
 
-    EVP_PKEY_up_ref(data);
+    CRYPTO_add(&data->references, 1, CRYPTO_LOCK_EVP_PKEY);
 #ifdef REF_PRINT
     REF_PRINT("EVP_PKEY", data);
 #endif
@@ -761,7 +771,7 @@ EVP_PKEY *STORE_list_public_key_next(STORE *s, void *handle)
                  STORE_R_FAILED_LISTING_KEYS);
         return 0;
     }
-    EVP_PKEY_up_ref(object->data.key);
+    CRYPTO_add(&object->data.key->references, 1, CRYPTO_LOCK_EVP_PKEY);
 #ifdef REF_PRINT
     REF_PRINT("EVP_PKEY", data);
 #endif
@@ -811,7 +821,7 @@ X509_CRL *STORE_generate_crl(STORE *s, OPENSSL_ITEM attributes[],
         STOREerr(STORE_F_STORE_GENERATE_CRL, STORE_R_FAILED_GENERATING_CRL);
         return 0;
     }
-    X509_CRL_up_ref(object->data.crl);
+    CRYPTO_add(&object->data.crl->references, 1, CRYPTO_LOCK_X509_CRL);
 #ifdef REF_PRINT
     REF_PRINT("X509_CRL", data);
 #endif
@@ -835,7 +845,7 @@ X509_CRL *STORE_get_crl(STORE *s, OPENSSL_ITEM attributes[],
         STOREerr(STORE_F_STORE_GET_CRL, STORE_R_FAILED_GETTING_KEY);
         return 0;
     }
-    X509_CRL_up_ref(object->data.crl);
+    CRYPTO_add(&object->data.crl->references, 1, CRYPTO_LOCK_X509_CRL);
 #ifdef REF_PRINT
     REF_PRINT("X509_CRL", data);
 #endif
@@ -854,12 +864,12 @@ int STORE_store_crl(STORE *s, X509_CRL *data, OPENSSL_ITEM attributes[],
                 store_object, STORE_R_NO_STORE_OBJECT_FUNCTION);
 
     object = STORE_OBJECT_new();
-    if (object == NULL) {
+    if (!object) {
         STOREerr(STORE_F_STORE_STORE_CRL, ERR_R_MALLOC_FAILURE);
         return 0;
     }
 
-    X509_CRL_up_ref(data);
+    CRYPTO_add(&data->references, 1, CRYPTO_LOCK_X509_CRL);
 #ifdef REF_PRINT
     REF_PRINT("X509_CRL", data);
 #endif
@@ -940,7 +950,7 @@ X509_CRL *STORE_list_crl_next(STORE *s, void *handle)
         STOREerr(STORE_F_STORE_LIST_CRL_NEXT, STORE_R_FAILED_LISTING_KEYS);
         return 0;
     }
-    X509_CRL_up_ref(object->data.crl);
+    CRYPTO_add(&object->data.crl->references, 1, CRYPTO_LOCK_X509_CRL);
 #ifdef REF_PRINT
     REF_PRINT("X509_CRL", data);
 #endif
@@ -983,7 +993,7 @@ int STORE_store_number(STORE *s, BIGNUM *data, OPENSSL_ITEM attributes[],
                 store_object, STORE_R_NO_STORE_OBJECT_NUMBER_FUNCTION);
 
     object = STORE_OBJECT_new();
-    if (object == NULL) {
+    if (!object) {
         STOREerr(STORE_F_STORE_STORE_NUMBER, ERR_R_MALLOC_FAILURE);
         return 0;
     }
@@ -1067,7 +1077,7 @@ int STORE_store_arbitrary(STORE *s, BUF_MEM *data, OPENSSL_ITEM attributes[],
                 store_object, STORE_R_NO_STORE_OBJECT_ARBITRARY_FUNCTION);
 
     object = STORE_OBJECT_new();
-    if (object == NULL) {
+    if (!object) {
         STOREerr(STORE_F_STORE_STORE_ARBITRARY, ERR_R_MALLOC_FAILURE);
         return 0;
     }
@@ -1146,7 +1156,9 @@ int STORE_delete_arbitrary(STORE *s, OPENSSL_ITEM attributes[],
 
 STORE_OBJECT *STORE_OBJECT_new(void)
 {
-    STORE_OBJECT *object = OPENSSL_zalloc(sizeof(*object));
+    STORE_OBJECT *object = OPENSSL_malloc(sizeof(STORE_OBJECT));
+    if (object)
+        memset(object, 0, sizeof(STORE_OBJECT));
     return object;
 }
 
@@ -1175,6 +1187,8 @@ void STORE_OBJECT_free(STORE_OBJECT *data)
     OPENSSL_free(data);
 }
 
+IMPLEMENT_STACK_OF(STORE_OBJECT*)
+
 struct STORE_attr_info_st {
     unsigned char set[(STORE_ATTR_TYPE_NUM + 8) / 8];
     union {
@@ -1194,9 +1208,7 @@ struct STORE_attr_info_st {
 
 STORE_ATTR_INFO *STORE_ATTR_INFO_new(void)
 {
-    STORE_ATTR_INFO *p = OPENSSL_malloc(sizeof(*p));
-
-    return p;
+    return (STORE_ATTR_INFO *)OPENSSL_malloc(sizeof(STORE_ATTR_INFO));
 }
 
 static void STORE_ATTR_INFO_attr_free(STORE_ATTR_INFO *attrs,
@@ -1304,7 +1316,7 @@ int STORE_ATTR_INFO_set_cstr(STORE_ATTR_INFO *attrs, STORE_ATTR_TYPES code,
         return 0;
     }
     if (!ATTR_IS_SET(attrs, code)) {
-        if ((attrs->values[code].cstring = OPENSSL_strndup(cstr, cstr_size)))
+        if ((attrs->values[code].cstring = BUF_strndup(cstr, cstr_size)))
             return 1;
         STOREerr(STORE_F_STORE_ATTR_INFO_SET_CSTR, ERR_R_MALLOC_FAILURE);
         return 0;
@@ -1323,7 +1335,7 @@ int STORE_ATTR_INFO_set_sha1str(STORE_ATTR_INFO *attrs, STORE_ATTR_TYPES code,
     }
     if (!ATTR_IS_SET(attrs, code)) {
         if ((attrs->values[code].sha1string =
-             (unsigned char *)OPENSSL_memdup(sha1str, sha1str_size)))
+             (unsigned char *)BUF_memdup(sha1str, sha1str_size)))
             return 1;
         STOREerr(STORE_F_STORE_ATTR_INFO_SET_SHA1STR, ERR_R_MALLOC_FAILURE);
         return 0;
@@ -1440,8 +1452,9 @@ struct attr_list_ctx_st {
 void *STORE_parse_attrs_start(OPENSSL_ITEM *attributes)
 {
     if (attributes) {
-        struct attr_list_ctx_st *context = OPENSSL_malloc(sizeof(*context));
-        if (context != NULL)
+        struct attr_list_ctx_st *context = (struct attr_list_ctx_st *)
+            OPENSSL_malloc(sizeof(struct attr_list_ctx_st));
+        if (context)
             context->attributes = attributes;
         else
             STOREerr(STORE_F_STORE_PARSE_ATTRS_START, ERR_R_MALLOC_FAILURE);
@@ -1465,7 +1478,7 @@ STORE_ATTR_INFO *STORE_parse_attrs_next(void *handle)
             case STORE_ATTR_FRIENDLYNAME:
             case STORE_ATTR_EMAIL:
             case STORE_ATTR_FILENAME:
-                if (attrs == NULL)
+                if (!attrs)
                     attrs = STORE_ATTR_INFO_new();
                 if (attrs == NULL) {
                     STOREerr(STORE_F_STORE_PARSE_ATTRS_NEXT,
@@ -1482,7 +1495,7 @@ STORE_ATTR_INFO *STORE_parse_attrs_next(void *handle)
             case STORE_ATTR_SUBJECTKEYID:
             case STORE_ATTR_ISSUERSERIALHASH:
             case STORE_ATTR_CERTHASH:
-                if (attrs == NULL)
+                if (!attrs)
                     attrs = STORE_ATTR_INFO_new();
                 if (attrs == NULL) {
                     STOREerr(STORE_F_STORE_PARSE_ATTRS_NEXT,
@@ -1496,7 +1509,7 @@ STORE_ATTR_INFO *STORE_parse_attrs_next(void *handle)
                 break;
             case STORE_ATTR_ISSUER:
             case STORE_ATTR_SUBJECT:
-                if (attrs == NULL)
+                if (!attrs)
                     attrs = STORE_ATTR_INFO_new();
                 if (attrs == NULL) {
                     STOREerr(STORE_F_STORE_PARSE_ATTRS_NEXT,
@@ -1508,7 +1521,7 @@ STORE_ATTR_INFO *STORE_parse_attrs_next(void *handle)
                                           context->attributes->value);
                 break;
             case STORE_ATTR_SERIAL:
-                if (attrs == NULL)
+                if (!attrs)
                     attrs = STORE_ATTR_INFO_new();
                 if (attrs == NULL) {
                     STOREerr(STORE_F_STORE_PARSE_ATTRS_NEXT,

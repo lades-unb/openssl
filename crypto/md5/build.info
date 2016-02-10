@@ -1,3 +1,0 @@
-LIBS=../../libcrypto
-SOURCE[../../libcrypto]=\
-        md5_dgst.c md5_one.c {- $target{md5_asm_src} -}

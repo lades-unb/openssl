@@ -1,3 +1,4 @@
+/* crypto/asn1/a_verify.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -58,7 +59,8 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
+#include "asn1_locl.h"
 
 #ifndef NO_SYS_TYPES_H
 # include <sys/types.h>
@@ -69,23 +71,18 @@
 #include <openssl/objects.h>
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
-#include "internal/asn1_int.h"
-#include "internal/evp_int.h"
 
 #ifndef NO_ASN1_OLD
 
 int ASN1_verify(i2d_of_void *i2d, X509_ALGOR *a, ASN1_BIT_STRING *signature,
                 char *data, EVP_PKEY *pkey)
 {
-    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+    EVP_MD_CTX ctx;
     const EVP_MD *type;
     unsigned char *p, *buf_in = NULL;
     int ret = -1, i, inl;
 
-    if (ctx == NULL) {
-        ASN1err(ASN1_F_ASN1_VERIFY, ERR_R_MALLOC_FAILURE);
-        goto err;
-    }
+    EVP_MD_CTX_init(&ctx);
     i = OBJ_obj2nid(a->algorithm);
     type = EVP_get_digestbyname(OBJ_nid2sn(i));
     if (type == NULL) {
@@ -107,26 +104,30 @@ int ASN1_verify(i2d_of_void *i2d, X509_ALGOR *a, ASN1_BIT_STRING *signature,
     p = buf_in;
 
     i2d(data, &p);
-    ret = EVP_VerifyInit_ex(ctx, type, NULL)
-        && EVP_VerifyUpdate(ctx, (unsigned char *)buf_in, inl);
-
-    OPENSSL_clear_free(buf_in, (unsigned int)inl);
-
-    if (!ret) {
+    if (!EVP_VerifyInit_ex(&ctx, type, NULL)
+        || !EVP_VerifyUpdate(&ctx, (unsigned char *)buf_in, inl)) {
         ASN1err(ASN1_F_ASN1_VERIFY, ERR_R_EVP_LIB);
+        ret = 0;
         goto err;
     }
-    ret = -1;
 
-    if (EVP_VerifyFinal(ctx, (unsigned char *)signature->data,
+    OPENSSL_cleanse(buf_in, (unsigned int)inl);
+    OPENSSL_free(buf_in);
+
+    if (EVP_VerifyFinal(&ctx, (unsigned char *)signature->data,
                         (unsigned int)signature->length, pkey) <= 0) {
         ASN1err(ASN1_F_ASN1_VERIFY, ERR_R_EVP_LIB);
         ret = 0;
         goto err;
     }
+    /*
+     * we don't need to zero the 'ctx' because we just checked public
+     * information
+     */
+    /* memset(&ctx,0,sizeof(ctx)); */
     ret = 1;
  err:
-    EVP_MD_CTX_free(ctx);
+    EVP_MD_CTX_cleanup(&ctx);
     return (ret);
 }
 
@@ -135,7 +136,7 @@ int ASN1_verify(i2d_of_void *i2d, X509_ALGOR *a, ASN1_BIT_STRING *signature,
 int ASN1_item_verify(const ASN1_ITEM *it, X509_ALGOR *a,
                      ASN1_BIT_STRING *signature, void *asn, EVP_PKEY *pkey)
 {
-    EVP_MD_CTX *ctx = NULL;
+    EVP_MD_CTX ctx;
     unsigned char *buf_in = NULL;
     int ret = -1, inl;
 
@@ -151,11 +152,7 @@ int ASN1_item_verify(const ASN1_ITEM *it, X509_ALGOR *a,
         return -1;
     }
 
-    ctx = EVP_MD_CTX_new();
-    if (ctx == NULL) {
-        ASN1err(ASN1_F_ASN1_ITEM_VERIFY, ERR_R_MALLOC_FAILURE);
-        goto err;
-    }
+    EVP_MD_CTX_init(&ctx);
 
     /* Convert signature OID into digest and public key OIDs */
     if (!OBJ_find_sigid_algs(OBJ_obj2nid(a->algorithm), &mdnid, &pknid)) {
@@ -168,7 +165,7 @@ int ASN1_item_verify(const ASN1_ITEM *it, X509_ALGOR *a,
                     ASN1_R_UNKNOWN_SIGNATURE_ALGORITHM);
             goto err;
         }
-        ret = pkey->ameth->item_verify(ctx, it, asn, a, signature, pkey);
+        ret = pkey->ameth->item_verify(&ctx, it, asn, a, signature, pkey);
         /*
          * Return value of 2 means carry on, anything else means we exit
          * straight away: either a fatal error of the underlying verification
@@ -192,7 +189,7 @@ int ASN1_item_verify(const ASN1_ITEM *it, X509_ALGOR *a,
             goto err;
         }
 
-        if (!EVP_DigestVerifyInit(ctx, NULL, type, NULL, pkey)) {
+        if (!EVP_DigestVerifyInit(&ctx, NULL, type, NULL, pkey)) {
             ASN1err(ASN1_F_ASN1_ITEM_VERIFY, ERR_R_EVP_LIB);
             ret = 0;
             goto err;
@@ -207,24 +204,28 @@ int ASN1_item_verify(const ASN1_ITEM *it, X509_ALGOR *a,
         goto err;
     }
 
-    ret = EVP_DigestVerifyUpdate(ctx, buf_in, inl);
-
-    OPENSSL_clear_free(buf_in, (unsigned int)inl);
-
-    if (!ret) {
+    if (!EVP_DigestVerifyUpdate(&ctx, buf_in, inl)) {
         ASN1err(ASN1_F_ASN1_ITEM_VERIFY, ERR_R_EVP_LIB);
+        ret = 0;
         goto err;
     }
-    ret = -1;
 
-    if (EVP_DigestVerifyFinal(ctx, signature->data,
+    OPENSSL_cleanse(buf_in, (unsigned int)inl);
+    OPENSSL_free(buf_in);
+
+    if (EVP_DigestVerifyFinal(&ctx, signature->data,
                               (size_t)signature->length) <= 0) {
         ASN1err(ASN1_F_ASN1_ITEM_VERIFY, ERR_R_EVP_LIB);
         ret = 0;
         goto err;
     }
+    /*
+     * we don't need to zero the 'ctx' because we just checked public
+     * information
+     */
+    /* memset(&ctx,0,sizeof(ctx)); */
     ret = 1;
  err:
-    EVP_MD_CTX_free(ctx);
+    EVP_MD_CTX_cleanup(&ctx);
     return (ret);
 }

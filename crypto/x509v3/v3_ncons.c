@@ -1,3 +1,4 @@
+/* v3_ncons.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
@@ -57,13 +58,10 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/asn1t.h>
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
-
-#include "internal/x509_int.h"
-#include "ext_dat.h"
 
 static void *v2i_NAME_CONSTRAINTS(const X509V3_EXT_METHOD *method,
                                   X509V3_CTX *ctx,
@@ -81,7 +79,6 @@ static int nc_dn(X509_NAME *sub, X509_NAME *nm);
 static int nc_dns(ASN1_IA5STRING *sub, ASN1_IA5STRING *dns);
 static int nc_email(ASN1_IA5STRING *sub, ASN1_IA5STRING *eml);
 static int nc_uri(ASN1_IA5STRING *uri, ASN1_IA5STRING *base);
-static int nc_ip(ASN1_OCTET_STRING *ip, ASN1_OCTET_STRING *base);
 
 const X509V3_EXT_METHOD v3_name_constraints = {
     NID_name_constraints, 0,
@@ -118,16 +115,15 @@ static void *v2i_NAME_CONSTRAINTS(const X509V3_EXT_METHOD *method,
     STACK_OF(GENERAL_SUBTREE) **ptree = NULL;
     NAME_CONSTRAINTS *ncons = NULL;
     GENERAL_SUBTREE *sub = NULL;
-
     ncons = NAME_CONSTRAINTS_new();
-    if (ncons == NULL)
+    if (!ncons)
         goto memerr;
     for (i = 0; i < sk_CONF_VALUE_num(nval); i++) {
         val = sk_CONF_VALUE_value(nval, i);
-        if (strncmp(val->name, "permitted", 9) == 0 && val->name[9]) {
+        if (!strncmp(val->name, "permitted", 9) && val->name[9]) {
             ptree = &ncons->permittedSubtrees;
             tval.name = val->name + 10;
-        } else if (strncmp(val->name, "excluded", 8) == 0 && val->name[8]) {
+        } else if (!strncmp(val->name, "excluded", 8) && val->name[8]) {
             ptree = &ncons->excludedSubtrees;
             tval.name = val->name + 9;
         } else {
@@ -136,13 +132,11 @@ static void *v2i_NAME_CONSTRAINTS(const X509V3_EXT_METHOD *method,
         }
         tval.value = val->value;
         sub = GENERAL_SUBTREE_new();
-        if (sub == NULL)
-            goto memerr;
         if (!v2i_GENERAL_NAME_ex(sub->base, method, ctx, &tval, 1))
             goto err;
-        if (*ptree == NULL)
+        if (!*ptree)
             *ptree = sk_GENERAL_SUBTREE_new_null();
-        if (*ptree == NULL || !sk_GENERAL_SUBTREE_push(*ptree, sub))
+        if (!*ptree || !sk_GENERAL_SUBTREE_push(*ptree, sub))
             goto memerr;
         sub = NULL;
     }
@@ -152,8 +146,10 @@ static void *v2i_NAME_CONSTRAINTS(const X509V3_EXT_METHOD *method,
  memerr:
     X509V3err(X509V3_F_V2I_NAME_CONSTRAINTS, ERR_R_MALLOC_FAILURE);
  err:
-    NAME_CONSTRAINTS_free(ncons);
-    GENERAL_SUBTREE_free(sub);
+    if (ncons)
+        NAME_CONSTRAINTS_free(ncons);
+    if (sub)
+        GENERAL_SUBTREE_free(sub);
 
     return NULL;
 }
@@ -343,9 +339,6 @@ static int nc_match_single(GENERAL_NAME *gen, GENERAL_NAME *base)
         return nc_uri(gen->d.uniformResourceIdentifier,
                       base->d.uniformResourceIdentifier);
 
-    case GEN_IPADD:
-        return nc_ip(gen->d.iPAddress, base->d.iPAddress);
-
     default:
         return X509_V_ERR_UNSUPPORTED_CONSTRAINT_TYPE;
     }
@@ -405,11 +398,11 @@ static int nc_email(ASN1_IA5STRING *eml, ASN1_IA5STRING *base)
     const char *emlat = strchr(emlptr, '@');
     if (!emlat)
         return X509_V_ERR_UNSUPPORTED_NAME_SYNTAX;
-    /* Special case: initial '.' is RHS match */
+    /* Special case: inital '.' is RHS match */
     if (!baseat && (*baseptr == '.')) {
         if (eml->length > base->length) {
             emlptr += eml->length - base->length;
-            if (strcasecmp(baseptr, emlptr) == 0)
+            if (!strcasecmp(baseptr, emlptr))
                 return X509_V_OK;
         }
         return X509_V_ERR_PERMITTED_VIOLATION;
@@ -465,11 +458,11 @@ static int nc_uri(ASN1_IA5STRING *uri, ASN1_IA5STRING *base)
     if (hostlen == 0)
         return X509_V_ERR_UNSUPPORTED_NAME_SYNTAX;
 
-    /* Special case: initial '.' is RHS match */
+    /* Special case: inital '.' is RHS match */
     if (*baseptr == '.') {
         if (hostlen > base->length) {
             p = hostptr + hostlen - base->length;
-            if (strncasecmp(p, baseptr, base->length) == 0)
+            if (!strncasecmp(p, baseptr, base->length))
                 return X509_V_OK;
         }
         return X509_V_ERR_PERMITTED_VIOLATION;
@@ -478,37 +471,6 @@ static int nc_uri(ASN1_IA5STRING *uri, ASN1_IA5STRING *base)
     if ((base->length != (int)hostlen)
         || strncasecmp(hostptr, baseptr, hostlen))
         return X509_V_ERR_PERMITTED_VIOLATION;
-
-    return X509_V_OK;
-
-}
-
-static int nc_ip(ASN1_OCTET_STRING *ip, ASN1_OCTET_STRING *base)
-{
-    int hostlen, baselen, i;
-    unsigned char *hostptr, *baseptr, *maskptr;
-    hostptr = ip->data;
-    hostlen = ip->length;
-    baseptr = base->data;
-    baselen = base->length;
-
-    /* Invalid if not IPv4 or IPv6 */
-    if (!((hostlen == 4) || (hostlen == 16)))
-        return X509_V_ERR_UNSUPPORTED_NAME_SYNTAX;
-    if (!((baselen == 8) || (baselen == 32)))
-        return X509_V_ERR_UNSUPPORTED_NAME_SYNTAX;
-
-    /* Do not match IPv4 with IPv6 */
-    if (hostlen * 2 != baselen)
-        return X509_V_ERR_PERMITTED_VIOLATION;
-
-    maskptr = base->data + hostlen;
-
-    /* Considering possible not aligned base ipAddress */
-    /* Not checking for wrong mask definition: i.e.: 255.0.255.0 */
-    for (i = 0; i < hostlen; i++)
-        if ((hostptr[i] & maskptr[i]) != (baseptr[i] & maskptr[i]))
-            return X509_V_ERR_PERMITTED_VIOLATION;
 
     return X509_V_OK;
 

@@ -1,3 +1,4 @@
+/* p12_kiss.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/pkcs12.h>
 
 /* Simplified PKCS#12 routines */
@@ -75,7 +76,7 @@ static int parse_bag(PKCS12_SAFEBAG *bag, const char *pass, int passlen,
  * Parse and decrypt a PKCS#12 structure returning user key, user cert and
  * other (CA) certs. Note either ca should be NULL, *ca should be NULL, or it
  * should point to a valid STACK structure. pkey and cert can be passed
- * uninitialised.
+ * unitialised.
  */
 
 int PKCS12_parse(PKCS12 *p12, const char *pass, EVP_PKEY **pkey, X509 **cert,
@@ -151,21 +152,25 @@ int PKCS12_parse(PKCS12 *p12, const char *pass, EVP_PKEY **pkey, X509 **cert,
                 goto err;
             x = NULL;
         }
-        X509_free(x);
+        if (x)
+            X509_free(x);
     }
 
-    sk_X509_pop_free(ocerts, X509_free);
+    if (ocerts)
+        sk_X509_pop_free(ocerts, X509_free);
 
     return 1;
 
  err:
 
-    if (pkey)
+    if (pkey && *pkey)
         EVP_PKEY_free(*pkey);
-    if (cert)
+    if (cert && *cert)
         X509_free(*cert);
-    X509_free(x);
-    sk_X509_pop_free(ocerts, X509_free);
+    if (x)
+        X509_free(x);
+    if (ocerts)
+        sk_X509_pop_free(ocerts, X509_free);
     return 0;
 
 }
@@ -180,7 +185,7 @@ static int parse_pk12(PKCS12 *p12, const char *pass, int passlen,
     int i, bagnid;
     PKCS7 *p7;
 
-    if ((asafes = PKCS12_unpack_authsafes(p12)) == NULL)
+    if (!(asafes = PKCS12_unpack_authsafes(p12)))
         return 0;
     for (i = 0; i < sk_PKCS7_num(asafes); i++) {
         p7 = sk_PKCS7_value(asafes, i);
@@ -237,14 +242,14 @@ static int parse_bag(PKCS12_SAFEBAG *bag, const char *pass, int passlen,
     case NID_keyBag:
         if (!pkey || *pkey)
             return 1;
-        if ((*pkey = EVP_PKCS82PKEY(bag->value.keybag)) == NULL)
+        if (!(*pkey = EVP_PKCS82PKEY(bag->value.keybag)))
             return 0;
         break;
 
     case NID_pkcs8ShroudedKeyBag:
         if (!pkey || *pkey)
             return 1;
-        if ((p8 = PKCS12_decrypt_skey(bag, pass, passlen)) == NULL)
+        if (!(p8 = PKCS12_decrypt_skey(bag, pass, passlen)))
             return 0;
         *pkey = EVP_PKCS82PKEY(p8);
         PKCS8_PRIV_KEY_INFO_free(p8);
@@ -255,7 +260,7 @@ static int parse_bag(PKCS12_SAFEBAG *bag, const char *pass, int passlen,
     case NID_certBag:
         if (M_PKCS12_cert_bag_type(bag) != NID_x509Certificate)
             return 1;
-        if ((x509 = PKCS12_certbag2x509(bag)) == NULL)
+        if (!(x509 = PKCS12_certbag2x509(bag)))
             return 0;
         if (lkid && !X509_keyid_set1(x509, lkid->data, lkid->length)) {
             X509_free(x509);
@@ -284,9 +289,11 @@ static int parse_bag(PKCS12_SAFEBAG *bag, const char *pass, int passlen,
 
     case NID_safeContentsBag:
         return parse_bags(bag->value.safes, pass, passlen, pkey, ocerts);
+        break;
 
     default:
         return 1;
+        break;
     }
     return 1;
 }

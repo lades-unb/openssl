@@ -1,3 +1,4 @@
+/* crypto/md4/md4_dgst.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -57,7 +58,10 @@
 
 #include <stdio.h>
 #include <openssl/opensslv.h>
+#include <openssl/crypto.h>
 #include "md4_locl.h"
+
+const char MD4_version[] = "MD4" OPENSSL_VERSION_PTEXT;
 
 /*
  * Implemented from RFC1186 The MD4 Message-Digest Algorithm
@@ -68,7 +72,7 @@
 #define INIT_DATA_C (unsigned long)0x98badcfeL
 #define INIT_DATA_D (unsigned long)0x10325476L
 
-int MD4_Init(MD4_CTX *c)
+fips_md_init(MD4)
 {
     memset(c, 0, sizeof(*c));
     c->A = INIT_DATA_A;

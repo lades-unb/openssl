@@ -48,19 +48,19 @@ void main(int argc,char *argv[])
 		{
 		for (i=0; i<1000; i++) /**/
 			{
-			CAST_encrypt(&data[0],&key);
+			CAST_encrypt((unsigned int *) &data[0],&key);
 			GetTSC(s1);
-			CAST_encrypt(&data[0],&key);
-			CAST_encrypt(&data[0],&key);
-			CAST_encrypt(&data[0],&key);
+			CAST_encrypt((unsigned int *)&data[0], &key);
+			CAST_encrypt((unsigned int *)&data[0], &key);
+			CAST_encrypt((unsigned int *)&data[0], &key);
 			GetTSC(e1);
 			GetTSC(s2);
-			CAST_encrypt(&data[0],&key);
-			CAST_encrypt(&data[0],&key);
-			CAST_encrypt(&data[0],&key);
-			CAST_encrypt(&data[0],&key);
+			CAST_encrypt((unsigned int *)&data[0], &key);
+			CAST_encrypt((unsigned int *)&data[0], &key);
+			CAST_encrypt((unsigned int *)&data[0], &key);
+			CAST_encrypt((unsigned int *)&data[0], &key);
 			GetTSC(e2);
-			CAST_encrypt(&data[0],&key);
+			CAST_encrypt((unsigned int *)&data[0], &key);
 			}
 
 		printf("cast %d %d (%d)\n",

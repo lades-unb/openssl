@@ -1,3 +1,4 @@
+/* crypto/des/enc_writ.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -58,7 +59,7 @@
 #include <errno.h>
 #include <time.h>
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include "des_locl.h"
 #include <openssl/rand.h>
 
@@ -134,8 +135,9 @@ int DES_enc_write(int fd, const void *_buf, int len,
     if (len < 8) {
         cp = shortbuf;
         memcpy(shortbuf, buf, len);
-        if (RAND_bytes(shortbuf + len, 8 - len) <= 0)
+        if (RAND_pseudo_bytes(shortbuf + len, 8 - len) < 0) {
             return -1;
+        }
         rnum = 8;
     } else {
         cp = buf;

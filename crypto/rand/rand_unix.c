@@ -1,3 +1,4 @@
+/* crypto/rand/rand_unix.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -111,11 +112,11 @@
 
 #define USE_SOCKETS
 #include "e_os.h"
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/rand.h>
 #include "rand_lcl.h"
 
-#if !(defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_WIN32) || defined(OPENSSL_SYS_VMS) || defined(OPENSSL_SYS_OS2) || defined(OPENSSL_SYS_VXWORKS) || defined(OPENSSL_SYS_NETWARE) || defined(OPENSSL_SYS_UEFI))
+#if !(defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_WIN32) || defined(OPENSSL_SYS_VMS) || defined(OPENSSL_SYS_OS2) || defined(OPENSSL_SYS_VXWORKS) || defined(OPENSSL_SYS_NETWARE))
 
 # include <sys/types.h>
 # include <sys/time.h>
@@ -243,17 +244,17 @@ int RAND_poll(void)
 {
     unsigned long l;
     pid_t curr_pid = getpid();
-#  if defined(DEVRANDOM) || (!defined(OPENSS_NO_EGD) && defined(DEVRANDOM_EGD))
+#  if defined(DEVRANDOM) || defined(DEVRANDOM_EGD)
     unsigned char tmpbuf[ENTROPY_NEEDED];
     int n = 0;
 #  endif
 #  ifdef DEVRANDOM
     static const char *randomfiles[] = { DEVRANDOM };
-    struct stat randomstats[OSSL_NELEM(randomfiles)];
+    struct stat randomstats[sizeof(randomfiles) / sizeof(randomfiles[0])];
     int fd;
     unsigned int i;
 #  endif
-#  if !defined(OPENSSL_NO_EGD) && defined(DEVRANDOM_EGD)
+#  ifdef DEVRANDOM_EGD
     static const char *egdsockets[] = { DEVRANDOM_EGD, NULL };
     const char **egdsocket = NULL;
 #  endif
@@ -266,7 +267,8 @@ int RAND_poll(void)
      * out of random entries.
      */
 
-    for (i = 0; (i < OSSL_NELEM(randomfiles)) && (n < ENTROPY_NEEDED); i++) {
+    for (i = 0; (i < sizeof(randomfiles) / sizeof(randomfiles[0])) &&
+         (n < ENTROPY_NEEDED); i++) {
         if ((fd = open(randomfiles[i], O_RDONLY
 #   ifdef O_NONBLOCK
                        | O_NONBLOCK
@@ -305,7 +307,14 @@ int RAND_poll(void)
             do {
                 int try_read = 0;
 
-#   if defined(OPENSSL_SYS_LINUX)
+#   if defined(OPENSSL_SYS_BEOS_R5)
+                /*
+                 * select() is broken in BeOS R5, so we simply try to read
+                 * something and snooze if we couldn't
+                 */
+                try_read = 1;
+
+#   elif defined(OPENSSL_SYS_LINUX)
                 /* use poll() */
                 struct pollfd pset;
 
@@ -349,6 +358,10 @@ int RAND_poll(void)
                              ENTROPY_NEEDED - n);
                     if (r > 0)
                         n += r;
+#   if defined(OPENSSL_SYS_BEOS_R5)
+                    if (r == 0)
+                        snooze(t.tv_usec);
+#   endif
                 } else
                     r = -1;
 
@@ -370,7 +383,7 @@ int RAND_poll(void)
     }
 #  endif                        /* defined(DEVRANDOM) */
 
-#  if !defined(OPENSSL_NO_EGD) && defined(DEVRANDOM_EGD)
+#  ifdef DEVRANDOM_EGD
     /*
      * Use an EGD socket to read entropy from an EGD or PRNGD entropy
      * collecting daemon.
@@ -387,7 +400,7 @@ int RAND_poll(void)
     }
 #  endif                        /* defined(DEVRANDOM_EGD) */
 
-#  if defined(DEVRANDOM) || (!defined(OPENSSL_NO_EGD) && defined(DEVRANDOM_EGD))
+#  if defined(DEVRANDOM) || defined(DEVRANDOM_EGD)
     if (n > 0) {
         RAND_add(tmpbuf, sizeof tmpbuf, (double)n);
         OPENSSL_cleanse(tmpbuf, n);
@@ -403,7 +416,15 @@ int RAND_poll(void)
     l = time(NULL);
     RAND_add(&l, sizeof(l), 0.0);
 
-#  if defined(DEVRANDOM) || (!defined(OPENSSL_NO_EGD) && defined(DEVRANDOM_EGD))
+#  if defined(OPENSSL_SYS_BEOS)
+    {
+        system_info sysInfo;
+        get_system_info(&sysInfo);
+        RAND_add(&sysInfo, sizeof(sysInfo), 0);
+    }
+#  endif
+
+#  if defined(DEVRANDOM) || defined(DEVRANDOM_EGD)
     return 1;
 #  else
     return 0;
@@ -418,7 +439,7 @@ int RAND_poll(void)
                                  * defined(OPENSSL_SYS_VXWORKS) ||
                                  * defined(OPENSSL_SYS_NETWARE)) */
 
-#if defined(OPENSSL_SYS_VXWORKS) || defined(OPENSSL_SYS_UEFI)
+#if defined(OPENSSL_SYS_VXWORKS)
 int RAND_poll(void)
 {
     return 0;

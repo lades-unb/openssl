@@ -1,3 +1,4 @@
+/* crypto/rsa/rsa_saos.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,7 +57,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/bn.h>
 #include <openssl/rsa.h>
 #include <openssl/objects.h>
@@ -82,7 +83,7 @@ int RSA_sign_ASN1_OCTET_STRING(int type,
                RSA_R_DIGEST_TOO_BIG_FOR_RSA_KEY);
         return (0);
     }
-    s = OPENSSL_malloc((unsigned int)j + 1);
+    s = (unsigned char *)OPENSSL_malloc((unsigned int)j + 1);
     if (s == NULL) {
         RSAerr(RSA_F_RSA_SIGN_ASN1_OCTET_STRING, ERR_R_MALLOC_FAILURE);
         return (0);
@@ -95,7 +96,8 @@ int RSA_sign_ASN1_OCTET_STRING(int type,
     else
         *siglen = i;
 
-    OPENSSL_clear_free(s, (unsigned int)j + 1);
+    OPENSSL_cleanse(s, (unsigned int)j + 1);
+    OPENSSL_free(s);
     return (ret);
 }
 
@@ -115,7 +117,7 @@ int RSA_verify_ASN1_OCTET_STRING(int dtype,
         return (0);
     }
 
-    s = OPENSSL_malloc((unsigned int)siglen);
+    s = (unsigned char *)OPENSSL_malloc((unsigned int)siglen);
     if (s == NULL) {
         RSAerr(RSA_F_RSA_VERIFY_ASN1_OCTET_STRING, ERR_R_MALLOC_FAILURE);
         goto err;
@@ -136,7 +138,11 @@ int RSA_verify_ASN1_OCTET_STRING(int dtype,
     } else
         ret = 1;
  err:
-    ASN1_OCTET_STRING_free(sig);
-    OPENSSL_clear_free(s, (unsigned int)siglen);
+    if (sig != NULL)
+        M_ASN1_OCTET_STRING_free(sig);
+    if (s != NULL) {
+        OPENSSL_cleanse(s, (unsigned int)siglen);
+        OPENSSL_free(s);
+    }
     return (ret);
 }

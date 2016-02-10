@@ -1,3 +1,4 @@
+/* crypto/pem/pem_pkey.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,7 +57,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/buffer.h>
 #include <openssl/objects.h>
 #include <openssl/evp.h>
@@ -70,8 +71,7 @@
 #ifndef OPENSSL_NO_DH
 # include <openssl/dh.h>
 #endif
-#include "internal/asn1_int.h"
-#include "internal/evp_int.h"
+#include "asn1_locl.h"
 
 int pem_check_suffix(const char *pem_str, const char *suffix);
 
@@ -96,7 +96,8 @@ EVP_PKEY *PEM_read_bio_PrivateKey(BIO *bp, EVP_PKEY **x, pem_password_cb *cb,
             goto p8err;
         ret = EVP_PKCS82PKEY(p8inf);
         if (x) {
-            EVP_PKEY_free((EVP_PKEY *)*x);
+            if (*x)
+                EVP_PKEY_free((EVP_PKEY *)*x);
             *x = ret;
         }
         PKCS8_PRIV_KEY_INFO_free(p8inf);
@@ -123,7 +124,8 @@ EVP_PKEY *PEM_read_bio_PrivateKey(BIO *bp, EVP_PKEY **x, pem_password_cb *cb,
             goto p8err;
         ret = EVP_PKCS82PKEY(p8inf);
         if (x) {
-            EVP_PKEY_free((EVP_PKEY *)*x);
+            if (*x)
+                EVP_PKEY_free((EVP_PKEY *)*x);
             *x = ret;
         }
         PKCS8_PRIV_KEY_INFO_free(p8inf);
@@ -139,7 +141,8 @@ EVP_PKEY *PEM_read_bio_PrivateKey(BIO *bp, EVP_PKEY **x, pem_password_cb *cb,
         PEMerr(PEM_F_PEM_READ_BIO_PRIVATEKEY, ERR_R_ASN1_LIB);
  err:
     OPENSSL_free(nm);
-    OPENSSL_clear_free(data, len);
+    OPENSSL_cleanse(data, len);
+    OPENSSL_free(data);
     return (ret);
 }
 
@@ -173,7 +176,7 @@ EVP_PKEY *PEM_read_bio_Parameters(BIO *bp, EVP_PKEY **x)
 
     if ((slen = pem_check_suffix(nm, "PARAMETERS")) > 0) {
         ret = EVP_PKEY_new();
-        if (ret == NULL)
+        if (!ret)
             goto err;
         if (!EVP_PKEY_set_type_str(ret, nm, slen)
             || !ret->ameth->param_decode
@@ -183,7 +186,8 @@ EVP_PKEY *PEM_read_bio_Parameters(BIO *bp, EVP_PKEY **x)
             goto err;
         }
         if (x) {
-            EVP_PKEY_free((EVP_PKEY *)*x);
+            if (*x)
+                EVP_PKEY_free((EVP_PKEY *)*x);
             *x = ret;
         }
     }
@@ -206,7 +210,7 @@ int PEM_write_bio_Parameters(BIO *bp, EVP_PKEY *x)
                               pem_str, bp, x, NULL, NULL, 0, 0, NULL);
 }
 
-#ifndef OPENSSL_NO_STDIO
+#ifndef OPENSSL_NO_FP_API
 EVP_PKEY *PEM_read_PrivateKey(FILE *fp, EVP_PKEY **x, pem_password_cb *cb,
                               void *u)
 {
@@ -257,7 +261,7 @@ DH *PEM_read_bio_DHparams(BIO *bp, DH **x, pem_password_cb *cb, void *u)
         return NULL;
     p = data;
 
-    if (strcmp(nm, PEM_STRING_DHXPARAMS) == 0)
+    if (!strcmp(nm, PEM_STRING_DHXPARAMS))
         ret = d2i_DHxparams(x, &p, len);
     else
         ret = d2i_DHparams(x, &p, len);
@@ -269,7 +273,7 @@ DH *PEM_read_bio_DHparams(BIO *bp, DH **x, pem_password_cb *cb, void *u)
     return ret;
 }
 
-# ifndef OPENSSL_NO_STDIO
+# ifndef OPENSSL_NO_FP_API
 DH *PEM_read_DHparams(FILE *fp, DH **x, pem_password_cb *cb, void *u)
 {
     BIO *b;

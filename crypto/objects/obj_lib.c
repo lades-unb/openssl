@@ -1,3 +1,4 @@
+/* crypto/objects/obj_lib.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,11 +57,10 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/lhash.h>
 #include <openssl/objects.h>
 #include <openssl/buffer.h>
-#include "internal/asn1_int.h"
 
 ASN1_OBJECT *OBJ_dup(const ASN1_OBJECT *o)
 {
@@ -113,10 +113,14 @@ ASN1_OBJECT *OBJ_dup(const ASN1_OBJECT *o)
     return (r);
  err:
     OBJerr(OBJ_F_OBJ_DUP, ERR_R_MALLOC_FAILURE);
-    OPENSSL_free(ln);
-    OPENSSL_free(sn);
-    OPENSSL_free(data);
-    OPENSSL_free(r);
+    if (ln != NULL)
+        OPENSSL_free(ln);
+    if (sn != NULL)
+        OPENSSL_free(sn);
+    if (data != NULL)
+        OPENSSL_free(data);
+    if (r != NULL)
+        OPENSSL_free(r);
     return (NULL);
 }
 

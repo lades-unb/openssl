@@ -1,3 +1,4 @@
+/* crypto/evp/e_old.c -*- mode:C; c-file-style: "eay" -*- */
 /*
  * Written by Richard Levitte (richard@levitte.org) for the OpenSSL project
  * 2004.
@@ -56,9 +57,7 @@
  *
  */
 
-#include <openssl/opensslconf.h>
-
-#if OPENSSL_API_COMPAT >= 0x00908000L
+#ifdef OPENSSL_NO_DEPRECATED
 static void *dummy = &dummy;
 #else
 

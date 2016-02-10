@@ -1,3 +1,4 @@
+/* crypto/cversion.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -55,22 +56,17 @@
  * [including the GNU Public Licence.]
  */
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 
 #ifndef NO_WINDOWS_BRAINDEATH
-//# include "buildinf.h"
+# include "buildinf.h"
 #endif
 
-unsigned long OpenSSL_version_num(void)
+const char *SSLeay_version(int t)
 {
-    return OPENSSL_VERSION_NUMBER;
-}
-
-const char *OpenSSL_version(int t)
-{
-    if (t == OPENSSL_VERSION)
+    if (t == SSLEAY_VERSION)
         return OPENSSL_VERSION_TEXT;
-    if (t == OPENSSL_BUILT_ON) {
+    if (t == SSLEAY_BUILT_ON) {
 #ifdef DATE
 # ifdef OPENSSL_USE_BUILD_DATE
         return (DATE);
@@ -81,21 +77,21 @@ const char *OpenSSL_version(int t)
         return ("built on: date not available");
 #endif
     }
-    if (t == OPENSSL_CFLAGS) {
+    if (t == SSLEAY_CFLAGS) {
 #ifdef CFLAGS
         return (CFLAGS);
 #else
         return ("compiler: information not available");
 #endif
     }
-    if (t == OPENSSL_PLATFORM) {
+    if (t == SSLEAY_PLATFORM) {
 #ifdef PLATFORM
         return (PLATFORM);
 #else
         return ("platform: information not available");
 #endif
     }
-    if (t == OPENSSL_DIR) {
+    if (t == SSLEAY_DIR) {
 #ifdef OPENSSLDIR
         return "OPENSSLDIR: \"" OPENSSLDIR "\"";
 #else
@@ -103,4 +99,9 @@ const char *OpenSSL_version(int t)
 #endif
     }
     return ("not available");
+}
+
+unsigned long SSLeay(void)
+{
+    return (SSLEAY_VERSION_NUMBER);
 }

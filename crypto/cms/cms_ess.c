@@ -1,3 +1,4 @@
+/* crypto/cms/cms_ess.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
@@ -51,7 +52,7 @@
  * ====================================================================
  */
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/asn1t.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
@@ -59,6 +60,9 @@
 #include <openssl/err.h>
 #include <openssl/cms.h>
 #include "cms_lcl.h"
+
+DECLARE_ASN1_ITEM(CMS_ReceiptRequest)
+DECLARE_ASN1_ITEM(CMS_Receipt)
 
 IMPLEMENT_ASN1_FUNCTIONS(CMS_ReceiptRequest)
 
@@ -96,14 +100,15 @@ CMS_ReceiptRequest *CMS_ReceiptRequest_create0(unsigned char *id, int idlen,
     CMS_ReceiptRequest *rr = NULL;
 
     rr = CMS_ReceiptRequest_new();
-    if (rr == NULL)
+    if (!rr)
         goto merr;
     if (id)
         ASN1_STRING_set0(rr->signedContentIdentifier, id, idlen);
     else {
         if (!ASN1_STRING_set(rr->signedContentIdentifier, NULL, 32))
             goto merr;
-        if (RAND_bytes(rr->signedContentIdentifier->data, 32) <= 0)
+        if (RAND_pseudo_bytes(rr->signedContentIdentifier->data, 32)
+            <= 0)
             goto err;
     }
 
@@ -124,7 +129,9 @@ CMS_ReceiptRequest *CMS_ReceiptRequest_create0(unsigned char *id, int idlen,
     CMSerr(CMS_F_CMS_RECEIPTREQUEST_CREATE0, ERR_R_MALLOC_FAILURE);
 
  err:
-    CMS_ReceiptRequest_free(rr);
+    if (rr)
+        CMS_ReceiptRequest_free(rr);
+
     return NULL;
 
 }
@@ -148,7 +155,8 @@ int CMS_add1_ReceiptRequest(CMS_SignerInfo *si, CMS_ReceiptRequest *rr)
     if (!r)
         CMSerr(CMS_F_CMS_ADD1_RECEIPTREQUEST, ERR_R_MALLOC_FAILURE);
 
-    OPENSSL_free(rrder);
+    if (rrder)
+        OPENSSL_free(rrder);
 
     return r;
 
@@ -331,8 +339,11 @@ int cms_Receipt_verify(CMS_ContentInfo *cms, CMS_ContentInfo *req_cms)
     r = 1;
 
  err:
-    CMS_ReceiptRequest_free(rr);
-    M_ASN1_free_of(rct, CMS_Receipt);
+    if (rr)
+        CMS_ReceiptRequest_free(rr);
+    if (rct)
+        M_ASN1_free_of(rct, CMS_Receipt);
+
     return r;
 
 }
@@ -376,6 +387,9 @@ ASN1_OCTET_STRING *cms_encode_Receipt(CMS_SignerInfo *si)
     os = ASN1_item_pack(&rct, ASN1_ITEM_rptr(CMS_Receipt), NULL);
 
  err:
-    CMS_ReceiptRequest_free(rr);
+    if (rr)
+        CMS_ReceiptRequest_free(rr);
+
     return os;
+
 }

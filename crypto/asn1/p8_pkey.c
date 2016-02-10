@@ -1,3 +1,4 @@
+/* p8_pkey.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/asn1t.h>
 #include <openssl/x509.h>
 
@@ -98,7 +99,7 @@ int PKCS8_pkey_set0(PKCS8_PRIV_KEY_INFO *priv, ASN1_OBJECT *aobj,
         int pmtype;
         ASN1_OCTET_STRING *oct;
         oct = ASN1_OCTET_STRING_new();
-        if (oct == NULL)
+        if (!oct)
             return 0;
         oct->data = penc;
         ppenc = &oct->data;

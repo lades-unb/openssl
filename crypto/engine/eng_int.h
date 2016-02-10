@@ -1,3 +1,4 @@
+/* crypto/engine/eng_int.h */
 /*
  * Written by Geoff Thorpe (geoff@geoffthorpe.net) for the OpenSSL project
  * 2000.
@@ -64,7 +65,7 @@
 #ifndef HEADER_ENGINE_INT_H
 # define HEADER_ENGINE_INT_H
 
-# include "internal/cryptlib.h"
+# include "cryptlib.h"
 /* Take public definitions from engine.h */
 # include <openssl/engine.h>
 
@@ -87,7 +88,7 @@ extern "C" {
                 (unsigned int)(e), (isfunct ? "funct" : "struct"), \
                 ((isfunct) ? ((e)->funct_ref - (diff)) : ((e)->struct_ref - (diff))), \
                 ((isfunct) ? (e)->funct_ref : (e)->struct_ref), \
-                (__FILE__), (__LINE__))
+                (__FILE__), (__LINE__));
 
 # else
 
@@ -105,12 +106,12 @@ typedef void (ENGINE_CLEANUP_CB) (void);
 typedef struct st_engine_cleanup_item {
     ENGINE_CLEANUP_CB *cb;
 } ENGINE_CLEANUP_ITEM;
-DEFINE_STACK_OF(ENGINE_CLEANUP_ITEM)
+DECLARE_STACK_OF(ENGINE_CLEANUP_ITEM)
 void engine_cleanup_add_first(ENGINE_CLEANUP_CB *cb);
 void engine_cleanup_add_last(ENGINE_CLEANUP_CB *cb);
 
 /* We need stacks of ENGINEs for use in eng_table.c */
-DEFINE_STACK_OF(ENGINE)
+DECLARE_STACK_OF(ENGINE)
 
 /*
  * If this symbol is defined then engine_table_select(), the function that is
@@ -178,7 +179,8 @@ struct engine_st {
     const RSA_METHOD *rsa_meth;
     const DSA_METHOD *dsa_meth;
     const DH_METHOD *dh_meth;
-    const EC_KEY_METHOD *ec_meth;
+    const ECDH_METHOD *ecdh_meth;
+    const ECDSA_METHOD *ecdsa_meth;
     const RAND_METHOD *rand_meth;
     const STORE_METHOD *store_meth;
     /* Cipher handling is via this callback */
@@ -214,10 +216,6 @@ struct engine_st {
     struct engine_st *prev;
     struct engine_st *next;
 };
-
-typedef struct st_engine_pile ENGINE_PILE;
-
-DEFINE_LHASH_OF(ENGINE_PILE);
 
 #ifdef  __cplusplus
 }

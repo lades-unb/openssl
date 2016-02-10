@@ -1,3 +1,4 @@
+/* v3_pcons.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
@@ -57,12 +58,11 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
-#include "ext_dat.h"
 
 static STACK_OF(CONF_VALUE) *i2v_POLICY_CONSTRAINTS(const X509V3_EXT_METHOD
                                                     *method, void *bcons, STACK_OF(CONF_VALUE)
@@ -108,17 +108,16 @@ static void *v2i_POLICY_CONSTRAINTS(const X509V3_EXT_METHOD *method,
     POLICY_CONSTRAINTS *pcons = NULL;
     CONF_VALUE *val;
     int i;
-
-    if ((pcons = POLICY_CONSTRAINTS_new()) == NULL) {
+    if (!(pcons = POLICY_CONSTRAINTS_new())) {
         X509V3err(X509V3_F_V2I_POLICY_CONSTRAINTS, ERR_R_MALLOC_FAILURE);
         return NULL;
     }
     for (i = 0; i < sk_CONF_VALUE_num(values); i++) {
         val = sk_CONF_VALUE_value(values, i);
-        if (strcmp(val->name, "requireExplicitPolicy") == 0) {
+        if (!strcmp(val->name, "requireExplicitPolicy")) {
             if (!X509V3_get_value_int(val, &pcons->requireExplicitPolicy))
                 goto err;
-        } else if (strcmp(val->name, "inhibitPolicyMapping") == 0) {
+        } else if (!strcmp(val->name, "inhibitPolicyMapping")) {
             if (!X509V3_get_value_int(val, &pcons->inhibitPolicyMapping))
                 goto err;
         } else {

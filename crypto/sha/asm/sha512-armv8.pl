@@ -31,14 +31,7 @@
 
 $flavour=shift;
 $output=shift;
-
-$0 =~ m/(.*[\/\\])[^\/\\]+$/; $dir=$1;
-( $xlate="${dir}arm-xlate.pl" and -f $xlate ) or
-( $xlate="${dir}../../perlasm/arm-xlate.pl" and -f $xlate) or
-die "can't locate arm-xlate.pl";
-
-open OUT,"| \"$^X\" $xlate $flavour $output";
-*STDOUT=*OUT;
+open STDOUT,">$output";
 
 if ($output =~ /512/) {
 	$BITS=512;
@@ -162,18 +155,13 @@ $code.=<<___;
 
 .text
 
-.extern	OPENSSL_armcap_P
 .globl	$func
 .type	$func,%function
 .align	6
 $func:
 ___
 $code.=<<___	if ($SZ==4);
-#ifdef	__ILP32__
-	ldrsw	x16,.LOPENSSL_armcap_P
-#else
 	ldr	x16,.LOPENSSL_armcap_P
-#endif
 	adr	x17,.LOPENSSL_armcap_P
 	add	x16,x16,x17
 	ldr	w16,[x16]
@@ -196,7 +184,7 @@ $code.=<<___;
 	ldp	$E,$F,[$ctx,#4*$SZ]
 	add	$num,$inp,$num,lsl#`log(16*$SZ)/log(2)`	// end of input
 	ldp	$G,$H,[$ctx,#6*$SZ]
-	adr	$Ktbl,.LK$BITS
+	adr	$Ktbl,K$BITS
 	stp	$ctx,$num,[x29,#96]
 
 .Loop:
@@ -246,8 +234,8 @@ $code.=<<___;
 .size	$func,.-$func
 
 .align	6
-.type	.LK$BITS,%object
-.LK$BITS:
+.type	K$BITS,%object
+K$BITS:
 ___
 $code.=<<___ if ($SZ==8);
 	.quad	0x428a2f98d728ae22,0x7137449123ef65cd
@@ -312,14 +300,10 @@ $code.=<<___ if ($SZ==4);
 	.long	0	//terminator
 ___
 $code.=<<___;
-.size	.LK$BITS,.-.LK$BITS
+.size	K$BITS,.-K$BITS
 .align	3
 .LOPENSSL_armcap_P:
-#ifdef	__ILP32__
-	.long	OPENSSL_armcap_P-.
-#else
 	.quad	OPENSSL_armcap_P-.
-#endif
 .asciz	"SHA$BITS block transform for ARMv8, CRYPTOGAMS by <appro\@openssl.org>"
 .align	2
 ___
@@ -341,7 +325,7 @@ sha256_block_armv8:
 	add		x29,sp,#0
 
 	ld1.32		{$ABCD,$EFGH},[$ctx]
-	adr		$Ktbl,.LK256
+	adr		$Ktbl,K256
 
 .Loop_hw:
 	ld1		{@MSG[0]-@MSG[3]},[$inp],#64

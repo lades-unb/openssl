@@ -1,3 +1,4 @@
+/* crypto/bn/bn_mpi.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,7 +57,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include "bn_lcl.h"
 
 int BN_bn2mpi(const BIGNUM *a, unsigned char *d)

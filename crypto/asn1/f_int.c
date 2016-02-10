@@ -1,3 +1,4 @@
+/* crypto/asn1/f_int.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,7 +57,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/buffer.h>
 #include <openssl/asn1.h>
 
@@ -100,6 +101,7 @@ int i2a_ASN1_INTEGER(BIO *bp, ASN1_INTEGER *a)
 
 int a2i_ASN1_INTEGER(BIO *bp, ASN1_INTEGER *bs, char *buf, int size)
 {
+    int ret = 0;
     int i, j, k, m, n, again, bufsize;
     unsigned char *s = NULL, *sp;
     unsigned char *bufp;
@@ -110,16 +112,16 @@ int a2i_ASN1_INTEGER(BIO *bp, ASN1_INTEGER *bs, char *buf, int size)
     bufsize = BIO_gets(bp, buf, size);
     for (;;) {
         if (bufsize < 1)
-            goto err;
+            goto err_sl;
         i = bufsize;
         if (buf[i - 1] == '\n')
             buf[--i] = '\0';
         if (i == 0)
-            goto err;
+            goto err_sl;
         if (buf[i - 1] == '\r')
             buf[--i] = '\0';
         if (i == 0)
-            goto err;
+            goto err_sl;
         again = (buf[i - 1] == '\\');
 
         for (j = 0; j < i; j++) {
@@ -145,7 +147,7 @@ int a2i_ASN1_INTEGER(BIO *bp, ASN1_INTEGER *bs, char *buf, int size)
          * We have now cleared all the crap off the end of the line
          */
         if (i < 2)
-            goto err;
+            goto err_sl;
 
         bufp = (unsigned char *)buf;
         if (first) {
@@ -159,15 +161,20 @@ int a2i_ASN1_INTEGER(BIO *bp, ASN1_INTEGER *bs, char *buf, int size)
         i -= again;
         if (i % 2 != 0) {
             ASN1err(ASN1_F_A2I_ASN1_INTEGER, ASN1_R_ODD_NUMBER_OF_CHARS);
-            return 0;
+            goto err;
         }
         i /= 2;
         if (num + i > slen) {
-            sp = OPENSSL_clear_realloc(s, slen, num + i * 2);
+            if (s == NULL)
+                sp = (unsigned char *)OPENSSL_malloc((unsigned int)num +
+                                                     i * 2);
+            else
+                sp = OPENSSL_realloc_clean(s, slen, num + i * 2);
             if (sp == NULL) {
                 ASN1err(ASN1_F_A2I_ASN1_INTEGER, ERR_R_MALLOC_FAILURE);
-                OPENSSL_free(s);
-                return 0;
+                if (s != NULL)
+                    OPENSSL_free(s);
+                goto err;
             }
             s = sp;
             slen = num + i * 2;
@@ -198,21 +205,11 @@ int a2i_ASN1_INTEGER(BIO *bp, ASN1_INTEGER *bs, char *buf, int size)
     }
     bs->length = num;
     bs->data = s;
-    return 1;
+    ret = 1;
  err:
-    ASN1err(ASN1_F_A2I_ASN1_INTEGER, ASN1_R_SHORT_LINE);
-    return 0;
-}
-
-int i2a_ASN1_ENUMERATED(BIO *bp, ASN1_ENUMERATED *a)
-{
-    return i2a_ASN1_INTEGER(bp, a);
-}
-
-int a2i_ASN1_ENUMERATED(BIO *bp, ASN1_ENUMERATED *bs, char *buf, int size)
-{
-    int rv = a2i_ASN1_INTEGER(bp, bs, buf, size);
-    if (rv == 1)
-        bs->type = V_ASN1_INTEGER | (bs->type & V_ASN1_NEG);
-    return rv;
+    if (0) {
+ err_sl:
+        ASN1err(ASN1_F_A2I_ASN1_INTEGER, ASN1_R_SHORT_LINE);
+    }
+    return (ret);
 }

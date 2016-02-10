@@ -1,3 +1,4 @@
+/* crypto/asn1/x_spki.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -61,7 +62,7 @@
   */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/x509.h>
 #include <openssl/asn1t.h>
 
@@ -74,7 +75,7 @@ IMPLEMENT_ASN1_FUNCTIONS(NETSCAPE_SPKAC)
 
 ASN1_SEQUENCE(NETSCAPE_SPKI) = {
         ASN1_SIMPLE(NETSCAPE_SPKI, spkac, NETSCAPE_SPKAC),
-        ASN1_EMBED(NETSCAPE_SPKI, sig_algor, X509_ALGOR),
+        ASN1_SIMPLE(NETSCAPE_SPKI, sig_algor, X509_ALGOR),
         ASN1_SIMPLE(NETSCAPE_SPKI, signature, ASN1_BIT_STRING)
 } ASN1_SEQUENCE_END(NETSCAPE_SPKI)
 

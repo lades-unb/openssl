@@ -1,3 +1,4 @@
+/* p12_utl.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/pkcs12.h>
 
 /* Cheap and nasty Unicode stuff */
@@ -67,11 +68,10 @@ unsigned char *OPENSSL_asc2uni(const char *asc, int asclen,
 {
     int ulen, i;
     unsigned char *unitmp;
-
     if (asclen == -1)
         asclen = strlen(asc);
     ulen = asclen * 2 + 2;
-    if ((unitmp = OPENSSL_malloc(ulen)) == NULL)
+    if (!(unitmp = OPENSSL_malloc(ulen)))
         return NULL;
     for (i = 0; i < ulen - 2; i += 2) {
         unitmp[i] = 0;
@@ -91,13 +91,12 @@ char *OPENSSL_uni2asc(unsigned char *uni, int unilen)
 {
     int asclen, i;
     char *asctmp;
-
     asclen = unilen / 2;
     /* If no terminating zero allow for one */
     if (!unilen || uni[unilen - 1])
         asclen++;
     uni++;
-    if ((asctmp = OPENSSL_malloc(asclen)) == NULL)
+    if (!(asctmp = OPENSSL_malloc(asclen)))
         return NULL;
     for (i = 0; i < unilen; i += 2)
         asctmp[i >> 1] = uni[i];
@@ -110,7 +109,7 @@ int i2d_PKCS12_bio(BIO *bp, PKCS12 *p12)
     return ASN1_item_i2d_bio(ASN1_ITEM_rptr(PKCS12), bp, p12);
 }
 
-#ifndef OPENSSL_NO_STDIO
+#ifndef OPENSSL_NO_FP_API
 int i2d_PKCS12_fp(FILE *fp, PKCS12 *p12)
 {
     return ASN1_item_i2d_fp(ASN1_ITEM_rptr(PKCS12), fp, p12);
@@ -122,7 +121,7 @@ PKCS12 *d2i_PKCS12_bio(BIO *bp, PKCS12 **p12)
     return ASN1_item_d2i_bio(ASN1_ITEM_rptr(PKCS12), bp, p12);
 }
 
-#ifndef OPENSSL_NO_STDIO
+#ifndef OPENSSL_NO_FP_API
 PKCS12 *d2i_PKCS12_fp(FILE *fp, PKCS12 **p12)
 {
     return ASN1_item_d2i_fp(ASN1_ITEM_rptr(PKCS12), fp, p12);

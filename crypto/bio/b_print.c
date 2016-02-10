@@ -1,3 +1,4 @@
+/* crypto/bio/b_print.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -71,7 +72,7 @@
 #include <ctype.h>
 #include <assert.h>
 #include <limits.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #ifndef NO_SYS_TYPES_H
 # include <sys/types.h>
 #endif
@@ -369,7 +370,7 @@ _dopr(char **sbuffer,
                        flags, min, max);
                 break;
             case 'p':
-                value = (size_t)va_arg(args, void *);
+                value = (long)va_arg(args, void *);
                 fmtint(sbuffer, buffer, &currlen, maxlen,
                        value, 16, min, max, flags | DP_F_NUM);
                 break;
@@ -710,7 +711,7 @@ doapr_outch(char **sbuffer,
         *maxlen += 1024;
         if (*buffer == NULL) {
             *buffer = OPENSSL_malloc(*maxlen);
-            if (*buffer == NULL) {
+            if (!*buffer) {
                 /* Panic! Can't really do anything sensible. Just return */
                 return;
             }
@@ -766,6 +767,7 @@ int BIO_vprintf(BIO *bio, const char *format, va_list args)
     int ignored;
 
     dynbuf = NULL;
+    CRYPTO_push_info("doapr()");
     _dopr(&hugebufp, &dynbuf, &hugebufsize, &retlen, &ignored, format, args);
     if (dynbuf) {
         ret = BIO_write(bio, dynbuf, (int)retlen);
@@ -773,6 +775,7 @@ int BIO_vprintf(BIO *bio, const char *format, va_list args)
     } else {
         ret = BIO_write(bio, hugebuf, (int)retlen);
     }
+    CRYPTO_pop_info();
     return (ret);
 }
 

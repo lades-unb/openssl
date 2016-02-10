@@ -1,3 +1,4 @@
+/* crypto/rand/rand_win.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -108,7 +109,7 @@
  *
  */
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/rand.h>
 #include "rand_lcl.h"
 
@@ -122,7 +123,7 @@
 
 /*
  * Limit the time spent walking through the heap, processes, threads and
- * modules to a maximum of 1000 milliseconds each, unless CryptoGenRandom
+ * modules to a maximum of 1000 miliseconds each, unless CryptoGenRandom
  * failed
  */
 # define MAXDELAY 1000
@@ -181,6 +182,7 @@ typedef BOOL(WINAPI *MODULE32) (HANDLE, LPMODULEENTRY32);
 
 #  include <lmcons.h>
 #  include <lmstats.h>
+#  if 1
 /*
  * The NET API is Unicode only.  It requires the use of the UNICODE macro.
  * When UNICODE is defined LPTSTR becomes LPWSTR.  LMSTR was was added to the
@@ -191,11 +193,12 @@ typedef BOOL(WINAPI *MODULE32) (HANDLE, LPMODULEENTRY32);
 typedef NET_API_STATUS(NET_API_FUNCTION *NETSTATGET)
  (LPWSTR, LPWSTR, DWORD, DWORD, LPBYTE *);
 typedef NET_API_STATUS(NET_API_FUNCTION *NETFREE) (LPBYTE);
+#  endif                        /* 1 */
 # endif                         /* !OPENSSL_SYS_WINCE */
 
 int RAND_poll(void)
 {
-    MEMORYSTATUS mst;
+    MEMORYSTATUS m;
     HCRYPTPROV hProvider = 0;
     DWORD w;
     int good = 0;
@@ -300,6 +303,9 @@ int RAND_poll(void)
                 if (gen(hProvider, sizeof(buf), buf) != 0) {
                     RAND_add(buf, sizeof(buf), 0);
                     good = 1;
+#  if 0
+                    printf("randomness from PROV_RSA_FULL\n");
+#  endif
                 }
                 release(hProvider, 0);
             }
@@ -309,6 +315,9 @@ int RAND_poll(void)
                 if (gen(hProvider, sizeof(buf), buf) != 0) {
                     RAND_add(buf, sizeof(buf), sizeof(buf));
                     good = 1;
+#  if 0
+                    printf("randomness from PROV_INTEL_SEC\n");
+#  endif
                 }
                 release(hProvider, 0);
             }
@@ -557,12 +566,16 @@ int RAND_poll(void)
     readtimer();
 
     /* memory usage statistics */
-    GlobalMemoryStatus(&mst);
-    RAND_add(&mst, sizeof(mst), 1);
+    GlobalMemoryStatus(&m);
+    RAND_add(&m, sizeof(m), 1);
 
     /* process ID */
     w = GetCurrentProcessId();
     RAND_add(&w, sizeof(w), 1);
+
+# if 0
+    printf("Exiting RAND_poll\n");
+# endif
 
     return (1);
 }
@@ -711,7 +724,7 @@ static void readscreen(void)
     bi.biClrImportant = 0;
 
     bmbits = OPENSSL_malloc(size);
-    if (bmbits != NULL) {
+    if (bmbits) {
         /* Now go through the whole screen, repeatedly grabbing n lines */
         for (y = 0; y < h - n; y += n) {
             unsigned char md[MD_DIGEST_LENGTH];

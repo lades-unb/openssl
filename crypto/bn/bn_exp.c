@@ -1,3 +1,4 @@
+/* crypto/bn/bn_exp.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -108,7 +109,7 @@
  *
  */
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include "bn_lcl.h"
 
 #include <stdlib.h>
@@ -281,14 +282,9 @@ int BN_mod_exp_recp(BIGNUM *r, const BIGNUM *a, const BIGNUM *p,
     }
 
     bits = BN_num_bits(p);
+
     if (bits == 0) {
-        /* x**0 mod 1 is still zero. */
-        if (BN_is_one(m)) {
-            ret = 1;
-            BN_zero(r);
-        } else {
-            ret = BN_one(r);
-        }
+        ret = BN_one(r);
         return ret;
     }
 
@@ -422,13 +418,7 @@ int BN_mod_exp_mont(BIGNUM *rr, const BIGNUM *a, const BIGNUM *p,
     }
     bits = BN_num_bits(p);
     if (bits == 0) {
-        /* x**0 mod 1 is still zero. */
-        if (BN_is_one(m)) {
-            ret = 1;
-            BN_zero(rr);
-        } else {
-            ret = BN_one(rr);
-        }
+        ret = BN_one(rr);
         return ret;
     }
 
@@ -568,7 +558,7 @@ int BN_mod_exp_mont(BIGNUM *rr, const BIGNUM *a, const BIGNUM *p,
         goto err;
     ret = 1;
  err:
-    if (in_mont == NULL)
+    if ((in_mont == NULL) && (mont != NULL))
         BN_MONT_CTX_free(mont);
     BN_CTX_end(ctx);
     bn_check_top(rr);
@@ -649,7 +639,7 @@ static int MOD_EXP_CTIME_COPY_FROM_PREBUF(BIGNUM *b, int top,
  * precomputation memory layout to limit data-dependency to a minimum to
  * protect secret exponents (cf. the hyper-threading timing attacks pointed
  * out by Colin Percival,
- * http://www.daemonology.net/hyperthreading-considered-harmful/)
+ * http://www.daemong-consideredperthreading-considered-harmful/)
  */
 int BN_mod_exp_mont_consttime(BIGNUM *rr, const BIGNUM *a, const BIGNUM *p,
                               const BIGNUM *m, BN_CTX *ctx,
@@ -672,22 +662,15 @@ int BN_mod_exp_mont_consttime(BIGNUM *rr, const BIGNUM *a, const BIGNUM *p,
     bn_check_top(p);
     bn_check_top(m);
 
-    if (!BN_is_odd(m)) {
+    top = m->top;
+
+    if (!(m->d[0] & 1)) {
         BNerr(BN_F_BN_MOD_EXP_MONT_CONSTTIME, BN_R_CALLED_WITH_EVEN_MODULUS);
         return (0);
     }
-
-    top = m->top;
-
     bits = BN_num_bits(p);
     if (bits == 0) {
-        /* x**0 mod 1 is still zero. */
-        if (BN_is_one(m)) {
-            ret = 1;
-            BN_zero(rr);
-        } else {
-            ret = BN_one(rr);
-        }
+        ret = BN_one(rr);
         return ret;
     }
 
@@ -769,7 +752,8 @@ int BN_mod_exp_mont_consttime(BIGNUM *rr, const BIGNUM *a, const BIGNUM *p,
     else
 #endif
         if ((powerbufFree =
-             OPENSSL_malloc(powerbufLen + MOD_EXP_CTIME_MIN_CACHE_LINE_WIDTH))
+             (unsigned char *)OPENSSL_malloc(powerbufLen +
+                                             MOD_EXP_CTIME_MIN_CACHE_LINE_WIDTH))
             == NULL)
         goto err;
 
@@ -1138,11 +1122,12 @@ int BN_mod_exp_mont_consttime(BIGNUM *rr, const BIGNUM *a, const BIGNUM *p,
         goto err;
     ret = 1;
  err:
-    if (in_mont == NULL)
+    if ((in_mont == NULL) && (mont != NULL))
         BN_MONT_CTX_free(mont);
     if (powerbuf != NULL) {
         OPENSSL_cleanse(powerbuf, powerbufLen);
-        OPENSSL_free(powerbufFree);
+        if (powerbufFree)
+            OPENSSL_free(powerbufFree);
     }
     BN_CTX_end(ctx);
     return (ret);
@@ -1196,9 +1181,8 @@ int BN_mod_exp_mont_word(BIGNUM *rr, BN_ULONG a, const BIGNUM *p,
         if (BN_is_one(m)) {
             ret = 1;
             BN_zero(rr);
-        } else {
+        } else
             ret = BN_one(rr);
-        }
         return ret;
     }
     if (a == 0) {
@@ -1288,7 +1272,7 @@ int BN_mod_exp_mont_word(BIGNUM *rr, BN_ULONG a, const BIGNUM *p,
     }
     ret = 1;
  err:
-    if (in_mont == NULL)
+    if ((in_mont == NULL) && (mont != NULL))
         BN_MONT_CTX_free(mont);
     BN_CTX_end(ctx);
     bn_check_top(rr);
@@ -1312,14 +1296,9 @@ int BN_mod_exp_simple(BIGNUM *r, const BIGNUM *a, const BIGNUM *p,
     }
 
     bits = BN_num_bits(p);
-   if (bits == 0) {
-        /* x**0 mod 1 is still zero. */
-        if (BN_is_one(m)) {
-            ret = 1;
-            BN_zero(r);
-        } else {
-            ret = BN_one(r);
-        }
+
+    if (bits == 0) {
+        ret = BN_one(r);
         return ret;
     }
 

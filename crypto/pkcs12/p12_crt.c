@@ -1,3 +1,4 @@
+/* p12_crt.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/pkcs12.h>
 
 static int pkcs12_add_bag(STACK_OF(PKCS12_SAFEBAG) **pbags,
@@ -89,12 +90,18 @@ PKCS12 *PKCS12_create(char *pass, char *name, EVP_PKEY *pkey, X509 *cert,
     unsigned int keyidlen = 0;
 
     /* Set defaults */
-    if (!nid_cert)
-#ifdef OPENSSL_NO_RC2
-        nid_cert = NID_pbe_WithSHA1And3_Key_TripleDES_CBC;
-#else
-        nid_cert = NID_pbe_WithSHA1And40BitRC2_CBC;
+    if (!nid_cert) {
+#ifdef OPENSSL_FIPS
+        if (FIPS_mode())
+            nid_cert = NID_pbe_WithSHA1And3_Key_TripleDES_CBC;
+        else
 #endif
+#ifdef OPENSSL_NO_RC2
+            nid_cert = NID_pbe_WithSHA1And3_Key_TripleDES_CBC;
+#else
+            nid_cert = NID_pbe_WithSHA1And40BitRC2_CBC;
+#endif
+    }
     if (!nid_key)
         nid_key = NID_pbe_WithSHA1And3_Key_TripleDES_CBC;
     if (!iter)
@@ -172,9 +179,13 @@ PKCS12 *PKCS12_create(char *pass, char *name, EVP_PKEY *pkey, X509 *cert,
     return p12;
 
  err:
-    PKCS12_free(p12);
-    sk_PKCS7_pop_free(safes, PKCS7_free);
-    sk_PKCS12_SAFEBAG_pop_free(bags, PKCS12_SAFEBAG_free);
+
+    if (p12)
+        PKCS12_free(p12);
+    if (safes)
+        sk_PKCS7_pop_free(safes, PKCS7_free);
+    if (bags)
+        sk_PKCS12_SAFEBAG_pop_free(bags, PKCS12_SAFEBAG_free);
     return NULL;
 
 }
@@ -188,7 +199,7 @@ PKCS12_SAFEBAG *PKCS12_add_cert(STACK_OF(PKCS12_SAFEBAG) **pbags, X509 *cert)
     int keyidlen = -1;
 
     /* Add user certificate */
-    if ((bag = PKCS12_x5092certbag(cert)) == NULL)
+    if (!(bag = PKCS12_x5092certbag(cert)))
         goto err;
 
     /*
@@ -211,7 +222,10 @@ PKCS12_SAFEBAG *PKCS12_add_cert(STACK_OF(PKCS12_SAFEBAG) **pbags, X509 *cert)
     return bag;
 
  err:
-    PKCS12_SAFEBAG_free(bag);
+
+    if (bag)
+        PKCS12_SAFEBAG_free(bag);
+
     return NULL;
 
 }
@@ -225,7 +239,7 @@ PKCS12_SAFEBAG *PKCS12_add_key(STACK_OF(PKCS12_SAFEBAG) **pbags,
     PKCS8_PRIV_KEY_INFO *p8 = NULL;
 
     /* Make a PKCS#8 structure */
-    if ((p8 = EVP_PKEY2PKCS8(key)) == NULL)
+    if (!(p8 = EVP_PKEY2PKCS8(key)))
         goto err;
     if (key_usage && !PKCS8_add_keyusage(p8, key_usage))
         goto err;
@@ -244,7 +258,10 @@ PKCS12_SAFEBAG *PKCS12_add_key(STACK_OF(PKCS12_SAFEBAG) **pbags,
     return bag;
 
  err:
-    PKCS12_SAFEBAG_free(bag);
+
+    if (bag)
+        PKCS12_SAFEBAG_free(bag);
+
     return NULL;
 
 }
@@ -287,7 +304,10 @@ int PKCS12_add_safe(STACK_OF(PKCS7) **psafes, STACK_OF(PKCS12_SAFEBAG) *bags,
         sk_PKCS7_free(*psafes);
         *psafes = NULL;
     }
-    PKCS7_free(p7);
+
+    if (p7)
+        PKCS7_free(p7);
+
     return 0;
 
 }

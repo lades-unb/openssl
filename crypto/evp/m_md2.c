@@ -1,3 +1,4 @@
+/* crypto/evp/m_md2.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,7 +57,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 
 #ifndef OPENSSL_NO_MD2
 
@@ -68,21 +69,19 @@
 #  include <openssl/rsa.h>
 # endif
 
-#include "internal/evp_int.h"
-
 static int init(EVP_MD_CTX *ctx)
 {
-    return MD2_Init(EVP_MD_CTX_md_data(ctx));
+    return MD2_Init(ctx->md_data);
 }
 
 static int update(EVP_MD_CTX *ctx, const void *data, size_t count)
 {
-    return MD2_Update(EVP_MD_CTX_md_data(ctx), data, count);
+    return MD2_Update(ctx->md_data, data, count);
 }
 
 static int final(EVP_MD_CTX *ctx, unsigned char *md)
 {
-    return MD2_Final(md, EVP_MD_CTX_md_data(ctx));
+    return MD2_Final(md, ctx->md_data);
 }
 
 static const EVP_MD md2_md = {
@@ -95,12 +94,13 @@ static const EVP_MD md2_md = {
     final,
     NULL,
     NULL,
+    EVP_PKEY_RSA_method,
     MD2_BLOCK,
     sizeof(EVP_MD *) + sizeof(MD2_CTX),
 };
 
 const EVP_MD *EVP_md2(void)
 {
-    return &md2_md;
+    return (&md2_md);
 }
 #endif

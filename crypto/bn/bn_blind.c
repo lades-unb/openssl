@@ -1,3 +1,4 @@
+/* crypto/bn/bn_blind.c */
 /* ====================================================================
  * Copyright (c) 1998-2006 The OpenSSL Project.  All rights reserved.
  *
@@ -108,8 +109,8 @@
  * [including the GNU Public Licence.]
  */
 
-#include <openssl/opensslconf.h>
-#include "internal/cryptlib.h"
+#include <stdio.h>
+#include "cryptlib.h"
 #include "bn_lcl.h"
 
 #define BN_BLINDING_COUNTER     32
@@ -119,7 +120,7 @@ struct bn_blinding_st {
     BIGNUM *Ai;
     BIGNUM *e;
     BIGNUM *mod;                /* just a reference */
-#if OPENSSL_API_COMPAT < 0x10000000L
+#ifndef OPENSSL_NO_DEPRECATED
     unsigned long thread_id;    /* added in OpenSSL 0.9.6j and 0.9.7b; used
                                  * only by crypto/rsa/rsa_eay.c, rsa_lib.c */
 #endif
@@ -137,10 +138,11 @@ BN_BLINDING *BN_BLINDING_new(const BIGNUM *A, const BIGNUM *Ai, BIGNUM *mod)
 
     bn_check_top(mod);
 
-    if ((ret = OPENSSL_zalloc(sizeof(*ret))) == NULL) {
+    if ((ret = (BN_BLINDING *)OPENSSL_malloc(sizeof(BN_BLINDING))) == NULL) {
         BNerr(BN_F_BN_BLINDING_NEW, ERR_R_MALLOC_FAILURE);
         return (NULL);
     }
+    memset(ret, 0, sizeof(BN_BLINDING));
     if (A != NULL) {
         if ((ret->A = BN_dup(A)) == NULL)
             goto err;
@@ -165,7 +167,8 @@ BN_BLINDING *BN_BLINDING_new(const BIGNUM *A, const BIGNUM *Ai, BIGNUM *mod)
     CRYPTO_THREADID_current(&ret->tid);
     return (ret);
  err:
-    BN_BLINDING_free(ret);
+    if (ret != NULL)
+        BN_BLINDING_free(ret);
     return (NULL);
 }
 
@@ -174,10 +177,14 @@ void BN_BLINDING_free(BN_BLINDING *r)
     if (r == NULL)
         return;
 
-    BN_free(r->A);
-    BN_free(r->Ai);
-    BN_free(r->e);
-    BN_free(r->mod);
+    if (r->A != NULL)
+        BN_free(r->A);
+    if (r->Ai != NULL)
+        BN_free(r->Ai);
+    if (r->e != NULL)
+        BN_free(r->e);
+    if (r->mod != NULL)
+        BN_free(r->mod);
     OPENSSL_free(r);
 }
 
@@ -271,7 +278,7 @@ int BN_BLINDING_invert_ex(BIGNUM *n, const BIGNUM *r, BN_BLINDING *b,
     return (ret);
 }
 
-#if OPENSSL_API_COMPAT < 0x10000000L
+#ifndef OPENSSL_NO_DEPRECATED
 unsigned long BN_BLINDING_get_thread_id(const BN_BLINDING *b)
 {
     return b->thread_id;
@@ -325,7 +332,8 @@ BN_BLINDING *BN_BLINDING_create_param(BN_BLINDING *b,
         goto err;
 
     if (e != NULL) {
-        BN_free(ret->e);
+        if (ret->e != NULL)
+            BN_free(ret->e);
         ret->e = BN_dup(e);
     }
     if (ret->e == NULL)
@@ -337,19 +345,20 @@ BN_BLINDING *BN_BLINDING_create_param(BN_BLINDING *b,
         ret->m_ctx = m_ctx;
 
     do {
-        int rv;
         if (!BN_rand_range(ret->A, ret->mod))
             goto err;
-        if (!int_bn_mod_inverse(ret->Ai, ret->A, ret->mod, ctx, &rv)) {
+        if (BN_mod_inverse(ret->Ai, ret->A, ret->mod, ctx) == NULL) {
             /*
              * this should almost never happen for good RSA keys
              */
-            if (rv) {
+            unsigned long error = ERR_peek_last_error();
+            if (ERR_GET_REASON(error) == BN_R_NO_INVERSE) {
                 if (retry_counter-- == 0) {
                     BNerr(BN_F_BN_BLINDING_CREATE_PARAM,
                           BN_R_TOO_MANY_ITERATIONS);
                     goto err;
                 }
+                ERR_clear_error();
             } else
                 goto err;
         } else
@@ -367,7 +376,7 @@ BN_BLINDING *BN_BLINDING_create_param(BN_BLINDING *b,
 
     return ret;
  err:
-    if (b == NULL) {
+    if (b == NULL && ret != NULL) {
         BN_BLINDING_free(ret);
         ret = NULL;
     }

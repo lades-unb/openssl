@@ -1,6 +1,7 @@
+/* crypto/bn/knownprimes.c */
 /* Insert boilerplate */
 
-#include <openssl/bn.h>
+#include "bn.h"
 
 /*-
  * "First Oakley Default Group" from RFC2409, section 6.1.

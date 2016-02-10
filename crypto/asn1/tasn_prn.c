@@ -1,3 +1,4 @@
+/* tasn_prn.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 2000.
@@ -57,14 +58,13 @@
  */
 
 #include <stddef.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/objects.h>
 #include <openssl/buffer.h>
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
-#include "internal/asn1_int.h"
 #include "asn1_locl.h"
 
 /*
@@ -73,7 +73,7 @@
 
 /* ASN1_PCTX routines */
 
-static ASN1_PCTX default_pctx = {
+ASN1_PCTX default_pctx = {
     ASN1_PCTX_FLAGS_SHOW_ABSENT, /* flags */
     0,                          /* nm_flags */
     0,                          /* cert_flags */
@@ -84,12 +84,16 @@ static ASN1_PCTX default_pctx = {
 ASN1_PCTX *ASN1_PCTX_new(void)
 {
     ASN1_PCTX *ret;
-
-    ret = OPENSSL_zalloc(sizeof(*ret));
+    ret = OPENSSL_malloc(sizeof(ASN1_PCTX));
     if (ret == NULL) {
         ASN1err(ASN1_F_ASN1_PCTX_NEW, ERR_R_MALLOC_FAILURE);
         return NULL;
     }
+    ret->flags = 0;
+    ret->nm_flags = 0;
+    ret->cert_flags = 0;
+    ret->oid_flags = 0;
+    ret->str_flags = 0;
     return ret;
 }
 
@@ -242,6 +246,10 @@ static int asn1_item_print_ctx(BIO *out, ASN1_VALUE **fld, int indent,
         break;
 
     case ASN1_ITYPE_CHOICE:
+#if 0
+        if (!nohdr && !asn1_print_fsname(out, indent, fname, sname, pctx))
+            return 0;
+#endif
         /* CHOICE type, get selector */
         i = asn1_get_choice_selector(fld, it);
         /* This should never happen... */
@@ -368,8 +376,13 @@ static int asn1_print_fsname(BIO *out, int indent,
                              const char *fname, const char *sname,
                              const ASN1_PCTX *pctx)
 {
-    static const char spaces[] = "                    ";
-    static const int nspaces = sizeof(spaces) - 1;
+    static char spaces[] = "                    ";
+    const int nspaces = sizeof(spaces) - 1;
+
+#if 0
+    if (!sname && !fname)
+        return 1;
+#endif
 
     while (indent > nspaces) {
         if (BIO_write(out, spaces, nspaces) != nspaces)

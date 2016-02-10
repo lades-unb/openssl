@@ -1,3 +1,4 @@
+/* crypto/rsa/rsa_lib.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -57,14 +58,20 @@
 
 #include <stdio.h>
 #include <openssl/crypto.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/lhash.h>
-#include "internal/bn_int.h"
+#include <openssl/bn.h>
 #include <openssl/rsa.h>
 #include <openssl/rand.h>
 #ifndef OPENSSL_NO_ENGINE
 # include <openssl/engine.h>
 #endif
+
+#ifdef OPENSSL_FIPS
+# include <openssl/fips.h>
+#endif
+
+const char RSA_version[] = "RSA" OPENSSL_VERSION_PTEXT;
 
 static const RSA_METHOD *default_RSA_meth = NULL;
 
@@ -83,10 +90,17 @@ void RSA_set_default_method(const RSA_METHOD *meth)
 const RSA_METHOD *RSA_get_default_method(void)
 {
     if (default_RSA_meth == NULL) {
-#ifdef RSA_NULL
-        default_RSA_meth = RSA_null_method();
+#ifdef OPENSSL_FIPS
+        if (FIPS_mode())
+            return FIPS_rsa_pkcs1_ssleay();
+        else
+            return RSA_PKCS1_SSLeay();
 #else
-        default_RSA_meth = RSA_PKCS1_OpenSSL();
+# ifdef RSA_NULL
+        default_RSA_meth = RSA_null_method();
+# else
+        default_RSA_meth = RSA_PKCS1_SSLeay();
+# endif
 #endif
     }
 
@@ -124,7 +138,7 @@ RSA *RSA_new_method(ENGINE *engine)
 {
     RSA *ret;
 
-    ret = OPENSSL_zalloc(sizeof(*ret));
+    ret = (RSA *)OPENSSL_malloc(sizeof(RSA));
     if (ret == NULL) {
         RSAerr(RSA_F_RSA_NEW_METHOD, ERR_R_MALLOC_FAILURE);
         return NULL;
@@ -152,7 +166,23 @@ RSA *RSA_new_method(ENGINE *engine)
     }
 #endif
 
+    ret->pad = 0;
+    ret->version = 0;
+    ret->n = NULL;
+    ret->e = NULL;
+    ret->d = NULL;
+    ret->p = NULL;
+    ret->q = NULL;
+    ret->dmp1 = NULL;
+    ret->dmq1 = NULL;
+    ret->iqmp = NULL;
     ret->references = 1;
+    ret->_method_mod_n = NULL;
+    ret->_method_mod_p = NULL;
+    ret->_method_mod_q = NULL;
+    ret->blinding = NULL;
+    ret->mt_blinding = NULL;
+    ret->bignum_data = NULL;
     ret->flags = ret->meth->flags & ~RSA_FLAG_NON_FIPS_ALLOW;
     if (!CRYPTO_new_ex_data(CRYPTO_EX_INDEX_RSA, ret, &ret->ex_data)) {
 #ifndef OPENSSL_NO_ENGINE
@@ -204,17 +234,28 @@ void RSA_free(RSA *r)
 
     CRYPTO_free_ex_data(CRYPTO_EX_INDEX_RSA, r, &r->ex_data);
 
-    BN_clear_free(r->n);
-    BN_clear_free(r->e);
-    BN_clear_free(r->d);
-    BN_clear_free(r->p);
-    BN_clear_free(r->q);
-    BN_clear_free(r->dmp1);
-    BN_clear_free(r->dmq1);
-    BN_clear_free(r->iqmp);
-    BN_BLINDING_free(r->blinding);
-    BN_BLINDING_free(r->mt_blinding);
-    OPENSSL_free(r->bignum_data);
+    if (r->n != NULL)
+        BN_clear_free(r->n);
+    if (r->e != NULL)
+        BN_clear_free(r->e);
+    if (r->d != NULL)
+        BN_clear_free(r->d);
+    if (r->p != NULL)
+        BN_clear_free(r->p);
+    if (r->q != NULL)
+        BN_clear_free(r->q);
+    if (r->dmp1 != NULL)
+        BN_clear_free(r->dmp1);
+    if (r->dmq1 != NULL)
+        BN_clear_free(r->dmq1);
+    if (r->iqmp != NULL)
+        BN_clear_free(r->iqmp);
+    if (r->blinding != NULL)
+        BN_BLINDING_free(r->blinding);
+    if (r->mt_blinding != NULL)
+        BN_BLINDING_free(r->mt_blinding);
+    if (r->bignum_data != NULL)
+        OPENSSL_free_locked(r->bignum_data);
     OPENSSL_free(r);
 }
 
@@ -231,6 +272,13 @@ int RSA_up_ref(RSA *r)
     }
 #endif
     return ((i > 1) ? 1 : 0);
+}
+
+int RSA_get_ex_new_index(long argl, void *argp, CRYPTO_EX_new *new_func,
+                         CRYPTO_EX_dup *dup_func, CRYPTO_EX_free *free_func)
+{
+    return CRYPTO_get_ex_new_index(CRYPTO_EX_INDEX_RSA, argl, argp,
+                                   new_func, dup_func, free_func);
 }
 
 int RSA_set_ex_data(RSA *r, int idx, void *arg)
@@ -258,25 +306,25 @@ int RSA_memory_lock(RSA *r)
     t[3] = &r->dmp1;
     t[4] = &r->dmq1;
     t[5] = &r->iqmp;
-    k = bn_sizeof_BIGNUM() * 6;
+    k = sizeof(BIGNUM) * 6;
     off = k / sizeof(BN_ULONG) + 1;
     j = 1;
     for (i = 0; i < 6; i++)
-        j += bn_get_top(*t[i]);
-    if ((p = OPENSSL_malloc((off + j) * sizeof(*p))) == NULL) {
+        j += (*t[i])->top;
+    if ((p = OPENSSL_malloc_locked((off + j) * sizeof(BN_ULONG))) == NULL) {
         RSAerr(RSA_F_RSA_MEMORY_LOCK, ERR_R_MALLOC_FAILURE);
         return (0);
     }
-    memset(p, 0, sizeof(*p) * (off + j));
     bn = (BIGNUM *)p;
     ul = (BN_ULONG *)&(p[off]);
     for (i = 0; i < 6; i++) {
         b = *(t[i]);
-        *(t[i]) = bn_array_el(bn, i);
-        memcpy(bn_array_el(bn, i), b, bn_sizeof_BIGNUM());
-        memcpy(ul, bn_get_words(b), sizeof(*ul) * bn_get_top(b));
-        bn_set_static_words(bn_array_el(bn, i), ul, bn_get_top(b));
-        ul += bn_get_top(b);
+        *(t[i]) = &(bn[i]);
+        memcpy((char *)&(bn[i]), (char *)b, sizeof(BIGNUM));
+        bn[i].flags = BN_FLG_STATIC_DATA;
+        bn[i].d = ul;
+        memcpy((char *)ul, b->d, sizeof(BN_ULONG) * b->top);
+        ul += b->top;
         BN_clear_free(b);
     }
 
@@ -285,9 +333,4 @@ int RSA_memory_lock(RSA *r)
 
     r->bignum_data = p;
     return (1);
-}
-
-int RSA_security_bits(const RSA *rsa)
-{
-    return BN_security_bits(BN_num_bits(rsa->n), -1);
 }

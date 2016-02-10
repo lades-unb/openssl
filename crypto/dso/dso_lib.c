@@ -1,3 +1,4 @@
+/* dso_lib.c -*- mode:C; c-file-style: "eay" -*- */
 /*
  * Written by Geoff Thorpe (geoff@geoffthorpe.net) for the OpenSSL project
  * 2000.
@@ -58,7 +59,7 @@
 
 #include <stdio.h>
 #include <openssl/crypto.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/dso.h>
 
 static DSO_METHOD *default_DSO_meth = NULL;
@@ -95,19 +96,19 @@ DSO *DSO_new_method(DSO_METHOD *meth)
 {
     DSO *ret;
 
-    if (default_DSO_meth == NULL) {
+    if (default_DSO_meth == NULL)
         /*
          * We default to DSO_METH_openssl() which in turn defaults to
          * stealing the "best available" method. Will fallback to
          * DSO_METH_null() in the worst case.
          */
         default_DSO_meth = DSO_METHOD_openssl();
-    }
-    ret = OPENSSL_zalloc(sizeof(*ret));
+    ret = (DSO *)OPENSSL_malloc(sizeof(DSO));
     if (ret == NULL) {
         DSOerr(DSO_F_DSO_NEW_METHOD, ERR_R_MALLOC_FAILURE);
         return (NULL);
     }
+    memset(ret, 0, sizeof(DSO));
     ret->meth_data = sk_void_new_null();
     if (ret->meth_data == NULL) {
         /* sk_new doesn't generate any errors so we do */
@@ -121,7 +122,6 @@ DSO *DSO_new_method(DSO_METHOD *meth)
         ret->meth = meth;
     ret->references = 1;
     if ((ret->meth->init != NULL) && !ret->meth->init(ret)) {
-        sk_void_free(ret->meth_data);
         OPENSSL_free(ret);
         ret = NULL;
     }
@@ -132,8 +132,10 @@ int DSO_free(DSO *dso)
 {
     int i;
 
-    if (dso == NULL)
-        return (1);
+    if (dso == NULL) {
+        DSOerr(DSO_F_DSO_FREE, ERR_R_PASSED_NULL_PARAMETER);
+        return (0);
+    }
 
     i = CRYPTO_add(&dso->references, -1, CRYPTO_LOCK_DSO);
 #ifdef REF_PRINT
@@ -159,8 +161,11 @@ int DSO_free(DSO *dso)
     }
 
     sk_void_free(dso->meth_data);
-    OPENSSL_free(dso->filename);
-    OPENSSL_free(dso->loaded_filename);
+    if (dso->filename != NULL)
+        OPENSSL_free(dso->filename);
+    if (dso->loaded_filename != NULL)
+        OPENSSL_free(dso->loaded_filename);
+
     OPENSSL_free(dso);
     return (1);
 }
@@ -353,8 +358,9 @@ int DSO_set_filename(DSO *dso, const char *filename)
         DSOerr(DSO_F_DSO_SET_FILENAME, ERR_R_MALLOC_FAILURE);
         return (0);
     }
-    OPENSSL_strlcpy(copied, filename, strlen(filename) + 1);
-    OPENSSL_free(dso->filename);
+    BUF_strlcpy(copied, filename, strlen(filename) + 1);
+    if (dso->filename)
+        OPENSSL_free(dso->filename);
     dso->filename = copied;
     return (1);
 }
@@ -402,7 +408,7 @@ char *DSO_convert_filename(DSO *dso, const char *filename)
             DSOerr(DSO_F_DSO_CONVERT_FILENAME, ERR_R_MALLOC_FAILURE);
             return (NULL);
         }
-        OPENSSL_strlcpy(result, filename, strlen(filename) + 1);
+        BUF_strlcpy(result, filename, strlen(filename) + 1);
     }
     return (result);
 }

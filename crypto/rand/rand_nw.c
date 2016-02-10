@@ -1,3 +1,4 @@
+/* crypto/rand/rand_nw.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -108,7 +109,7 @@
  *
  */
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/rand.h>
 #include "rand_lcl.h"
 
@@ -142,8 +143,8 @@ int RAND_poll(void)
      * SuperHighResolutionTimer.  Each iteration will collect 8 bytes of data
      * but it is treated as only 1 byte of entropy.  The call to
      * ThreadSwitchWithDelay() will introduce additional variability into the
-     * data returned by rdtsc. Applications can argument the seed material
-     * by adding additional stuff with RAND_add() and should probably do so.
+     * data returned by rdtsc. Applications can agument the seed material by
+     * adding additional stuff with RAND_add() and should probably do so.
      */
     l = GetProcessSwitchCount();
     RAND_add(&l, sizeof(l), 1);

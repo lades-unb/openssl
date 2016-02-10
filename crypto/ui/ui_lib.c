@@ -1,3 +1,4 @@
+/* crypto/ui/ui_lib.c -*- mode:C; c-file-style: "eay" -*- */
 /*
  * Written by Richard Levitte (richard@levitte.org) for the OpenSSL project
  * 2001.
@@ -57,12 +58,14 @@
  */
 
 #include <string.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/e_os2.h>
 #include <openssl/buffer.h>
 #include <openssl/ui.h>
 #include <openssl/err.h>
 #include "ui_locl.h"
+
+IMPLEMENT_STACK_OF(UI_STRING_ST)
 
 static const UI_METHOD *default_UI_meth = NULL;
 
@@ -73,8 +76,9 @@ UI *UI_new(void)
 
 UI *UI_new_method(const UI_METHOD *method)
 {
-    UI *ret = OPENSSL_zalloc(sizeof(*ret));
+    UI *ret;
 
+    ret = (UI *)OPENSSL_malloc(sizeof(UI));
     if (ret == NULL) {
         UIerr(UI_F_UI_NEW_METHOD, ERR_R_MALLOC_FAILURE);
         return NULL;
@@ -84,6 +88,9 @@ UI *UI_new_method(const UI_METHOD *method)
     else
         ret->meth = method;
 
+    ret->strings = NULL;
+    ret->user_data = NULL;
+    ret->flags = 0;
     CRYPTO_new_ex_data(CRYPTO_EX_INDEX_UI, ret, &ret->ex_data);
     return ret;
 }
@@ -137,7 +144,7 @@ static UI_STRING *general_allocate_prompt(UI *ui, const char *prompt,
     } else if ((type == UIT_PROMPT || type == UIT_VERIFY
                 || type == UIT_BOOLEAN) && result_buf == NULL) {
         UIerr(UI_F_GENERAL_ALLOCATE_PROMPT, UI_R_NO_RESULT_BUFFER);
-    } else if ((ret = OPENSSL_malloc(sizeof(*ret))) != NULL) {
+    } else if ((ret = (UI_STRING *)OPENSSL_malloc(sizeof(UI_STRING)))) {
         ret->out_string = prompt;
         ret->flags = prompt_freeable ? OUT_STRING_FREEABLE : 0;
         ret->input_flags = input_flags;
@@ -163,7 +170,7 @@ static int general_allocate_string(UI *ui, const char *prompt,
             s->_.string_data.result_maxsize = maxsize;
             s->_.string_data.test_buf = test_buf;
             ret = sk_UI_STRING_push(ui->strings, s);
-            /* sk_push() returns 0 on error.  Let's adapt that */
+            /* sk_push() returns 0 on error.  Let's addapt that */
             if (ret <= 0)
                 ret--;
         } else
@@ -207,7 +214,7 @@ static int general_allocate_boolean(UI *ui,
                 s->_.boolean_data.cancel_chars = cancel_chars;
                 ret = sk_UI_STRING_push(ui->strings, s);
                 /*
-                 * sk_push() returns 0 on error. Let's adapt that
+                 * sk_push() returns 0 on error. Let's addapt that
                  */
                 if (ret <= 0)
                     ret--;
@@ -237,7 +244,7 @@ int UI_dup_input_string(UI *ui, const char *prompt, int flags,
     char *prompt_copy = NULL;
 
     if (prompt) {
-        prompt_copy = OPENSSL_strdup(prompt);
+        prompt_copy = BUF_strdup(prompt);
         if (prompt_copy == NULL) {
             UIerr(UI_F_UI_DUP_INPUT_STRING, ERR_R_MALLOC_FAILURE);
             return 0;
@@ -265,7 +272,7 @@ int UI_dup_verify_string(UI *ui, const char *prompt, int flags,
     char *prompt_copy = NULL;
 
     if (prompt) {
-        prompt_copy = OPENSSL_strdup(prompt);
+        prompt_copy = BUF_strdup(prompt);
         if (prompt_copy == NULL) {
             UIerr(UI_F_UI_DUP_VERIFY_STRING, ERR_R_MALLOC_FAILURE);
             return -1;
@@ -296,7 +303,7 @@ int UI_dup_input_boolean(UI *ui, const char *prompt, const char *action_desc,
     char *cancel_chars_copy = NULL;
 
     if (prompt) {
-        prompt_copy = OPENSSL_strdup(prompt);
+        prompt_copy = BUF_strdup(prompt);
         if (prompt_copy == NULL) {
             UIerr(UI_F_UI_DUP_INPUT_BOOLEAN, ERR_R_MALLOC_FAILURE);
             goto err;
@@ -304,7 +311,7 @@ int UI_dup_input_boolean(UI *ui, const char *prompt, const char *action_desc,
     }
 
     if (action_desc) {
-        action_desc_copy = OPENSSL_strdup(action_desc);
+        action_desc_copy = BUF_strdup(action_desc);
         if (action_desc_copy == NULL) {
             UIerr(UI_F_UI_DUP_INPUT_BOOLEAN, ERR_R_MALLOC_FAILURE);
             goto err;
@@ -312,7 +319,7 @@ int UI_dup_input_boolean(UI *ui, const char *prompt, const char *action_desc,
     }
 
     if (ok_chars) {
-        ok_chars_copy = OPENSSL_strdup(ok_chars);
+        ok_chars_copy = BUF_strdup(ok_chars);
         if (ok_chars_copy == NULL) {
             UIerr(UI_F_UI_DUP_INPUT_BOOLEAN, ERR_R_MALLOC_FAILURE);
             goto err;
@@ -320,7 +327,7 @@ int UI_dup_input_boolean(UI *ui, const char *prompt, const char *action_desc,
     }
 
     if (cancel_chars) {
-        cancel_chars_copy = OPENSSL_strdup(cancel_chars);
+        cancel_chars_copy = BUF_strdup(cancel_chars);
         if (cancel_chars_copy == NULL) {
             UIerr(UI_F_UI_DUP_INPUT_BOOLEAN, ERR_R_MALLOC_FAILURE);
             goto err;
@@ -331,10 +338,14 @@ int UI_dup_input_boolean(UI *ui, const char *prompt, const char *action_desc,
                                     ok_chars_copy, cancel_chars_copy, 1,
                                     UIT_BOOLEAN, flags, result_buf);
  err:
-    OPENSSL_free(prompt_copy);
-    OPENSSL_free(action_desc_copy);
-    OPENSSL_free(ok_chars_copy);
-    OPENSSL_free(cancel_chars_copy);
+    if (prompt_copy)
+        OPENSSL_free(prompt_copy);
+    if (action_desc_copy)
+        OPENSSL_free(action_desc_copy);
+    if (ok_chars_copy)
+        OPENSSL_free(ok_chars_copy);
+    if (cancel_chars_copy)
+        OPENSSL_free(cancel_chars_copy);
     return -1;
 }
 
@@ -349,7 +360,7 @@ int UI_dup_info_string(UI *ui, const char *text)
     char *text_copy = NULL;
 
     if (text) {
-        text_copy = OPENSSL_strdup(text);
+        text_copy = BUF_strdup(text);
         if (text_copy == NULL) {
             UIerr(UI_F_UI_DUP_INFO_STRING, ERR_R_MALLOC_FAILURE);
             return -1;
@@ -371,7 +382,7 @@ int UI_dup_error_string(UI *ui, const char *text)
     char *text_copy = NULL;
 
     if (text) {
-        text_copy = OPENSSL_strdup(text);
+        text_copy = BUF_strdup(text);
         if (text_copy == NULL) {
             UIerr(UI_F_UI_DUP_ERROR_STRING, ERR_R_MALLOC_FAILURE);
             return -1;
@@ -401,16 +412,14 @@ char *UI_construct_prompt(UI *ui, const char *object_desc,
             len += sizeof(prompt2) - 1 + strlen(object_name);
         len += sizeof(prompt3) - 1;
 
-        prompt = OPENSSL_malloc(len + 1);
-        if (prompt == NULL)
-            return NULL;
-        OPENSSL_strlcpy(prompt, prompt1, len + 1);
-        OPENSSL_strlcat(prompt, object_desc, len + 1);
+        prompt = (char *)OPENSSL_malloc(len + 1);
+        BUF_strlcpy(prompt, prompt1, len + 1);
+        BUF_strlcat(prompt, object_desc, len + 1);
         if (object_name) {
-            OPENSSL_strlcat(prompt, prompt2, len + 1);
-            OPENSSL_strlcat(prompt, object_name, len + 1);
+            BUF_strlcat(prompt, prompt2, len + 1);
+            BUF_strlcat(prompt, object_name, len + 1);
         }
-        OPENSSL_strlcat(prompt, prompt3, len + 1);
+        BUF_strlcat(prompt, prompt3, len + 1);
     }
     return prompt;
 }
@@ -535,6 +544,13 @@ int UI_ctrl(UI *ui, int cmd, long i, void *p, void (*f) (void))
     return -1;
 }
 
+int UI_get_ex_new_index(long argl, void *argp, CRYPTO_EX_new *new_func,
+                        CRYPTO_EX_dup *dup_func, CRYPTO_EX_free *free_func)
+{
+    return CRYPTO_get_ex_new_index(CRYPTO_EX_INDEX_UI, argl, argp,
+                                   new_func, dup_func, free_func);
+}
+
 int UI_set_ex_data(UI *r, int idx, void *arg)
 {
     return (CRYPTO_set_ex_data(&r->ex_data, idx, arg));
@@ -571,10 +587,12 @@ const UI_METHOD *UI_set_method(UI *ui, const UI_METHOD *meth)
 
 UI_METHOD *UI_create_method(char *name)
 {
-    UI_METHOD *ui_method = OPENSSL_zalloc(sizeof(*ui_method));
+    UI_METHOD *ui_method = (UI_METHOD *)OPENSSL_malloc(sizeof(UI_METHOD));
 
-    if (ui_method != NULL)
-        ui_method->name = OPENSSL_strdup(name);
+    if (ui_method) {
+        memset(ui_method, 0, sizeof(*ui_method));
+        ui_method->name = BUF_strdup(name);
+    }
     return ui_method;
 }
 
@@ -821,7 +839,7 @@ int UI_set_result(UI *ui, UI_STRING *uis, const char *result)
             return -1;
         }
 
-        OPENSSL_strlcpy(uis->result_buf, result,
+        BUF_strlcpy(uis->result_buf, result,
                     uis->_.string_data.result_maxsize + 1);
         break;
     case UIT_BOOLEAN:

@@ -1,3 +1,4 @@
+/* crypto/engine/eng_all.c -*- mode: C; c-file-style: "eay" -*- */
 /*
  * Written by Richard Levitte <richard@levitte.org> for the OpenSSL project
  * 2000.
@@ -56,13 +57,26 @@
  *
  */
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include "eng_int.h"
+
+#define OPENSSL_NO_HW
+#define OPENSSL_NO_CAPIENG
+#define OPENSSL_NO_GOST
 
 void ENGINE_load_builtin_engines(void)
 {
     /* Some ENGINEs need this */
     OPENSSL_cpuid_setup();
+#if 0
+    /*
+     * There's no longer any need for an "openssl" ENGINE unless, one day, it
+     * is the *only* way for standard builtin implementations to be be
+     * accessed (ie. it would be possible to statically link binaries with
+     * *no* builtin implementations).
+     */
+    ENGINE_load_openssl();
+#endif
 #if !defined(OPENSSL_NO_HW) && (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(HAVE_CRYPTODEV))
     ENGINE_load_cryptodev();
 #endif
@@ -72,18 +86,39 @@ void ENGINE_load_builtin_engines(void)
     ENGINE_load_dynamic();
 #ifndef OPENSSL_NO_STATIC_ENGINE
 # ifndef OPENSSL_NO_HW
-/*-
- * These engines have been disabled as they do not currently build
-#ifndef OPENSSL_NO_HW_NCIPHER
-        ENGINE_load_chil();
-#endif
-#ifndef OPENSSL_NO_HW_UBSEC
-        ENGINE_load_ubsec();
-#endif
-*/
+#  ifndef OPENSSL_NO_HW_4758_CCA
+    ENGINE_load_4758cca();
+#  endif
+#  ifndef OPENSSL_NO_HW_AEP
+    ENGINE_load_aep();
+#  endif
+#  ifndef OPENSSL_NO_HW_ATALLA
+    ENGINE_load_atalla();
+#  endif
+#  ifndef OPENSSL_NO_HW_CSWIFT
+    ENGINE_load_cswift();
+#  endif
+#  ifndef OPENSSL_NO_HW_NCIPHER
+    ENGINE_load_chil();
+#  endif
+#  ifndef OPENSSL_NO_HW_NURON
+    ENGINE_load_nuron();
+#  endif
+#  ifndef OPENSSL_NO_HW_SUREWARE
+    ENGINE_load_sureware();
+#  endif
+#  ifndef OPENSSL_NO_HW_UBSEC
+    ENGINE_load_ubsec();
+#  endif
 #  ifndef OPENSSL_NO_HW_PADLOCK
     ENGINE_load_padlock();
 #  endif
+# endif
+# ifndef OPENSSL_NO_GOST
+    ENGINE_load_gost();
+# endif
+# ifndef OPENSSL_NO_GMP
+    ENGINE_load_gmp();
 # endif
 # if defined(OPENSSL_SYS_WIN32) && !defined(OPENSSL_NO_CAPIENG)
     ENGINE_load_capi();

@@ -1,3 +1,4 @@
+/* crypto/evp/m_ripemd.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,9 +57,9 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 
-#ifndef OPENSSL_NO_RMD160
+#ifndef OPENSSL_NO_RIPEMD
 
 # include <openssl/ripemd.h>
 # include <openssl/evp.h>
@@ -67,21 +68,21 @@
 # ifndef OPENSSL_NO_RSA
 #  include <openssl/rsa.h>
 # endif
-# include "internal/evp_int.h"
+# include "evp_locl.h"
 
 static int init(EVP_MD_CTX *ctx)
 {
-    return RIPEMD160_Init(EVP_MD_CTX_md_data(ctx));
+    return RIPEMD160_Init(ctx->md_data);
 }
 
 static int update(EVP_MD_CTX *ctx, const void *data, size_t count)
 {
-    return RIPEMD160_Update(EVP_MD_CTX_md_data(ctx), data, count);
+    return RIPEMD160_Update(ctx->md_data, data, count);
 }
 
 static int final(EVP_MD_CTX *ctx, unsigned char *md)
 {
-    return RIPEMD160_Final(md, EVP_MD_CTX_md_data(ctx));
+    return RIPEMD160_Final(md, ctx->md_data);
 }
 
 static const EVP_MD ripemd160_md = {
@@ -94,6 +95,7 @@ static const EVP_MD ripemd160_md = {
     final,
     NULL,
     NULL,
+    EVP_PKEY_RSA_method,
     RIPEMD160_CBLOCK,
     sizeof(EVP_MD *) + sizeof(RIPEMD160_CTX),
 };

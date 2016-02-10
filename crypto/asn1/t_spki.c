@@ -1,3 +1,4 @@
+/* t_spki.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/x509.h>
 #include <openssl/asn1.h>
 #ifndef OPENSSL_NO_RSA
@@ -90,7 +91,7 @@ int NETSCAPE_SPKI_print(BIO *out, NETSCAPE_SPKI *spki)
     chal = spki->spkac->challenge;
     if (chal->length)
         BIO_printf(out, "  Challenge String: %s\n", chal->data);
-    i = OBJ_obj2nid(spki->sig_algor.algorithm);
+    i = OBJ_obj2nid(spki->sig_algor->algorithm);
     BIO_printf(out, "  Signature Algorithm: %s",
                (i == NID_undef) ? "UNKNOWN" : OBJ_nid2ln(i));
 

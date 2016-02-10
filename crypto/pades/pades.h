@@ -15,6 +15,8 @@
 #include <openssl/asn1.h>
 #include <openssl/cms.h>
 
+#include "slre.h"
+
 
 #define MAX_SMLEN 1024
 
@@ -31,6 +33,8 @@ int PADES_write_ASN1(BIO *bio, ASN1_VALUE *val, BIO *data, int flags,
 BIO *read_text_file(const char *filename);
 int write_text_file(BIO *biomembuf, const char *filename);
 int strip_eol(char *linebuf, int *plen);
+
+int Pades_ASN1_Data_is_B64(BUF_MEM *buf);
 
 
 #ifdef  __cplusplus

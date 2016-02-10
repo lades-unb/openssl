@@ -1,3 +1,4 @@
+/* conf_lib.c */
 /*
  * Written by Richard Levitte (richard@levitte.org) for the OpenSSL project
  * 2000.
@@ -63,6 +64,8 @@
 #include <openssl/conf_api.h>
 #include <openssl/lhash.h>
 
+const char CONF_version[] = "CONF" OPENSSL_VERSION_PTEXT;
+
 static CONF_METHOD *default_CONF_method = NULL;
 
 /* Init a 'CONF' structure from an old LHASH */
@@ -109,13 +112,13 @@ LHASH_OF(CONF_VALUE) *CONF_load(LHASH_OF(CONF_VALUE) *conf, const char *file,
     return ltmp;
 }
 
-#ifndef OPENSSL_NO_STDIO
+#ifndef OPENSSL_NO_FP_API
 LHASH_OF(CONF_VALUE) *CONF_load_fp(LHASH_OF(CONF_VALUE) *conf, FILE *fp,
                                    long *eline)
 {
     BIO *btmp;
     LHASH_OF(CONF_VALUE) *ltmp;
-    if ((btmp = BIO_new_fp(fp, BIO_NOCLOSE)) == NULL) {
+    if (!(btmp = BIO_new_fp(fp, BIO_NOCLOSE))) {
         CONFerr(CONF_F_CONF_LOAD_FP, ERR_R_BUF_LIB);
         return NULL;
     }
@@ -191,13 +194,13 @@ void CONF_free(LHASH_OF(CONF_VALUE) *conf)
     NCONF_free_data(&ctmp);
 }
 
-#ifndef OPENSSL_NO_STDIO
+#ifndef OPENSSL_NO_FP_API
 int CONF_dump_fp(LHASH_OF(CONF_VALUE) *conf, FILE *out)
 {
     BIO *btmp;
     int ret;
 
-    if ((btmp = BIO_new_fp(out, BIO_NOCLOSE)) == NULL) {
+    if (!(btmp = BIO_new_fp(out, BIO_NOCLOSE))) {
         CONFerr(CONF_F_CONF_DUMP_FP, ERR_R_BUF_LIB);
         return 0;
     }
@@ -262,12 +265,12 @@ int NCONF_load(CONF *conf, const char *file, long *eline)
     return conf->meth->load(conf, file, eline);
 }
 
-#ifndef OPENSSL_NO_STDIO
+#ifndef OPENSSL_NO_FP_API
 int NCONF_load_fp(CONF *conf, FILE *fp, long *eline)
 {
     BIO *btmp;
     int ret;
-    if ((btmp = BIO_new_fp(fp, BIO_NOCLOSE)) == NULL) {
+    if (!(btmp = BIO_new_fp(fp, BIO_NOCLOSE))) {
         CONFerr(CONF_F_NCONF_LOAD_FP, ERR_R_BUF_LIB);
         return 0;
     }
@@ -346,12 +349,12 @@ int NCONF_get_number_e(const CONF *conf, const char *group, const char *name,
     return 1;
 }
 
-#ifndef OPENSSL_NO_STDIO
+#ifndef OPENSSL_NO_FP_API
 int NCONF_dump_fp(const CONF *conf, FILE *out)
 {
     BIO *btmp;
     int ret;
-    if ((btmp = BIO_new_fp(out, BIO_NOCLOSE)) == NULL) {
+    if (!(btmp = BIO_new_fp(out, BIO_NOCLOSE))) {
         CONFerr(CONF_F_NCONF_DUMP_FP, ERR_R_BUF_LIB);
         return 0;
     }
@@ -370,3 +373,19 @@ int NCONF_dump_bio(const CONF *conf, BIO *out)
 
     return conf->meth->dump(conf, out);
 }
+
+/* This function should be avoided */
+#if 0
+long NCONF_get_number(CONF *conf, char *group, char *name)
+{
+    int status;
+    long ret = 0;
+
+    status = NCONF_get_number_e(conf, group, name, &ret);
+    if (status == 0) {
+        /* This function does not believe in errors... */
+        ERR_get_error();
+    }
+    return ret;
+}
+#endif

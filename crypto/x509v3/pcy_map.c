@@ -1,3 +1,4 @@
+/* pcy_map.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 2004.
@@ -56,10 +57,9 @@
  *
  */
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
-#include "internal/x509_int.h"
 
 #include "pcy_int.h"
 
@@ -91,15 +91,15 @@ int policy_cache_set_mapping(X509 *x, POLICY_MAPPINGS *maps)
         /* Attempt to find matching policy data */
         data = policy_cache_find_data(cache, map->issuerDomainPolicy);
         /* If we don't have anyPolicy can't map */
-        if (data == NULL && !cache->anyPolicy)
+        if (!data && !cache->anyPolicy)
             continue;
 
         /* Create a NODE from anyPolicy */
-        if (data == NULL) {
+        if (!data) {
             data = policy_data_new(NULL, map->issuerDomainPolicy,
                                    cache->anyPolicy->flags
                                    & POLICY_DATA_FLAG_CRITICAL);
-            if (data == NULL)
+            if (!data)
                 goto bad_mapping;
             data->qualifier_set = cache->anyPolicy->qualifier_set;
             /*

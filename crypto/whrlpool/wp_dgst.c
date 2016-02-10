@@ -48,13 +48,14 @@
  *
  * Unlike authors' reference implementation, block processing
  * routine whirlpool_block is designed to operate on multi-block
- * input. This is done for performance.
+ * input. This is done for perfomance.
  */
 
 #include "wp_locl.h"
+#include <openssl/crypto.h>
 #include <string.h>
 
-int WHIRLPOOL_Init(WHIRLPOOL_CTX *c)
+fips_md_init(WHIRLPOOL)
 {
     memset(c, 0, sizeof(*c));
     return (1);

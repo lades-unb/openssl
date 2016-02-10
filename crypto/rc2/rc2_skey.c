@@ -1,3 +1,4 @@
+/* crypto/rc2/rc2_skey.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -55,7 +56,8 @@
  * [including the GNU Public Licence.]
  */
 
-#include <openssl/rc2.h>
+#include <openssl/crypto.h>
+#include "rc2.h"
 #include "rc2_locl.h"
 
 static const unsigned char key_table[256] = {
@@ -95,6 +97,15 @@ static const unsigned char key_table[256] = {
  * uses a version where the bits parameter is the same as len*8
  */
 void RC2_set_key(RC2_KEY *key, int len, const unsigned char *data, int bits)
+#ifdef OPENSSL_FIPS
+{
+    fips_cipher_abort(RC2);
+    private_RC2_set_key(key, len, data, bits);
+}
+
+void private_RC2_set_key(RC2_KEY *key, int len, const unsigned char *data,
+                         int bits)
+#endif
 {
     int i, j;
     unsigned char *k;

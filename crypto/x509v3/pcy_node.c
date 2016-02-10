@@ -1,3 +1,4 @@
+/* pcy_node.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 2004.
@@ -108,17 +109,17 @@ X509_POLICY_NODE *level_find_node(const X509_POLICY_LEVEL *level,
 }
 
 X509_POLICY_NODE *level_add_node(X509_POLICY_LEVEL *level,
-                                 X509_POLICY_DATA *data,
+                                 const X509_POLICY_DATA *data,
                                  X509_POLICY_NODE *parent,
                                  X509_POLICY_TREE *tree)
 {
     X509_POLICY_NODE *node;
-
-    node = OPENSSL_zalloc(sizeof(*node));
-    if (node == NULL)
+    node = OPENSSL_malloc(sizeof(X509_POLICY_NODE));
+    if (!node)
         return NULL;
     node->data = data;
     node->parent = parent;
+    node->nchild = 0;
     if (level) {
         if (OBJ_obj2nid(data->valid_policy) == NID_any_policy) {
             if (level->anyPolicy)
@@ -126,9 +127,9 @@ X509_POLICY_NODE *level_add_node(X509_POLICY_LEVEL *level,
             level->anyPolicy = node;
         } else {
 
-            if (level->nodes == NULL)
+            if (!level->nodes)
                 level->nodes = policy_node_cmp_new();
-            if (level->nodes == NULL)
+            if (!level->nodes)
                 goto node_error;
             if (!sk_X509_POLICY_NODE_push(level->nodes, node))
                 goto node_error;
@@ -136,9 +137,9 @@ X509_POLICY_NODE *level_add_node(X509_POLICY_LEVEL *level,
     }
 
     if (tree) {
-        if (tree->extra_data == NULL)
+        if (!tree->extra_data)
             tree->extra_data = sk_X509_POLICY_DATA_new_null();
-        if (tree->extra_data == NULL)
+        if (!tree->extra_data)
             goto node_error;
         if (!sk_X509_POLICY_DATA_push(tree->extra_data, data))
             goto node_error;
@@ -151,7 +152,8 @@ X509_POLICY_NODE *level_add_node(X509_POLICY_LEVEL *level,
 
  node_error:
     policy_node_free(node);
-    return NULL;
+    return 0;
+
 }
 
 void policy_node_free(X509_POLICY_NODE *node)

@@ -1,3 +1,4 @@
+/* crypto/x509/x509_d2.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,10 +57,11 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/crypto.h>
 #include <openssl/x509.h>
 
+#ifndef OPENSSL_NO_STDIO
 int X509_STORE_set_default_paths(X509_STORE *ctx)
 {
     X509_LOOKUP *lookup;
@@ -103,3 +105,5 @@ int X509_STORE_load_locations(X509_STORE *ctx, const char *file,
         return (0);
     return (1);
 }
+
+#endif

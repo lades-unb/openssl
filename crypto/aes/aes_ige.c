@@ -1,3 +1,4 @@
+/* crypto/aes/aes_ige.c -*- mode:C; c-file-style: "eay" -*- */
 /* ====================================================================
  * Copyright (c) 2006 The OpenSSL Project.  All rights reserved.
  *
@@ -48,7 +49,7 @@
  *
  */
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 
 #include <openssl/aes.h>
 #include "aes_locl.h"

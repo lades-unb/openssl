@@ -1,3 +1,4 @@
+/* pem_x509.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 2001.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/x509.h>

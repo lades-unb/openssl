@@ -1,3 +1,4 @@
+/* crypto/ui/ui_openssl.c -*- mode:C; c-file-style: "eay" -*- */
 /*
  * Written by Richard Levitte (richard@levitte.org) and others for the
  * OpenSSL project 2001.
@@ -123,7 +124,7 @@
  * sigaction and fileno included. -pedantic would be more appropriate for the
  * intended purposes, but we can't prevent users from adding -ansi.
  */
-#if defined(OPENSSL_SYS_VXWORKS)
+#if defined(OPENSSL_SYSNAME_VXWORKS)
 # include <sys/types.h>
 #endif
 
@@ -157,9 +158,16 @@
 # endif
 #endif
 
+#ifdef WIN16TTY
+# undef OPENSSL_SYS_WIN16
+# undef WIN16
+# undef _WINDOWS
+# include <graph.h>
+#endif
+
 /* 06-Apr-92 Luke Brennan    Support for VMS */
 #include "ui_locl.h"
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 
 #ifdef OPENSSL_SYS_VMS          /* prototypes for sys$whatever */
 # include <starlet.h>
@@ -199,7 +207,8 @@
  */
 # elif !defined(OPENSSL_SYS_VMS) \
 	&& !defined(OPENSSL_SYS_MSDOS) \
-	&& !defined(MAC_OS_GUSI_SOURCE) \
+	&& !defined(OPENSSL_SYS_MACINTOSH_CLASSIC) \
+	&& !defined(MAC_OS_GUSI_SOURCE)	\
 	&& !defined(OPENSSL_SYS_VXWORKS) \
 	&& !defined(OPENSSL_SYS_NETWARE)
 #  define TERMIOS
@@ -233,7 +242,7 @@
 # define TTY_set(tty,data)      ioctl(tty,TIOCSETP,data)
 #endif
 
-#if !defined(_LIBC) && !defined(OPENSSL_SYS_MSDOS) && !defined(OPENSSL_SYS_VMS)
+#if !defined(_LIBC) && !defined(OPENSSL_SYS_MSDOS) && !defined(OPENSSL_SYS_VMS) && !defined(OPENSSL_SYS_MACINTOSH_CLASSIC) && !defined(OPENSSL_SYS_SUNOS)
 # include <sys/ioctl.h>
 #endif
 
@@ -253,7 +262,11 @@ struct IOSB {
 };
 #endif
 
-#if defined(MAC_OS_GUSI_SOURCE) || defined(OPENSSL_SYS_NETWARE)
+#ifdef OPENSSL_SYS_SUNOS
+typedef int sig_atomic_t;
+#endif
+
+#if defined(OPENSSL_SYS_MACINTOSH_CLASSIC) || defined(MAC_OS_GUSI_SOURCE) || defined(OPENSSL_SYS_NETWARE)
 /*
  * This one needs work. As a matter of fact the code is unoperational
  * and this is only a trick to get it compiled.
@@ -290,13 +303,13 @@ static FILE *tty_in, *tty_out;
 static int is_a_tty;
 
 /* Declare static functions */
-#if !defined(OPENSSL_SYS_WINCE)
+#if !defined(OPENSSL_SYS_WIN16) && !defined(OPENSSL_SYS_WINCE)
 static int read_till_nl(FILE *);
 static void recsig(int);
 static void pushsig(void);
 static void popsig(void);
 #endif
-#if defined(OPENSSL_SYS_MSDOS)
+#if defined(OPENSSL_SYS_MSDOS) && !defined(OPENSSL_SYS_WIN16)
 static int noecho_fgets(char *buf, int size, FILE *tty);
 #endif
 static int read_string_inner(UI *ui, UI_STRING *uis, int echo, int strip_nl);
@@ -380,7 +393,7 @@ static int read_string(UI *ui, UI_STRING *uis)
     return 1;
 }
 
-#if !defined(OPENSSL_SYS_WINCE)
+#if !defined(OPENSSL_SYS_WIN16) && !defined(OPENSSL_SYS_WINCE)
 /* Internal functions to read a string without echoing */
 static int read_till_nl(FILE *in)
 {
@@ -403,7 +416,7 @@ static int read_string_inner(UI *ui, UI_STRING *uis, int echo, int strip_nl)
     int ok;
     char result[BUFSIZ];
     int maxsize = BUFSIZ - 1;
-#if !defined(OPENSSL_SYS_WINCE)
+#if !defined(OPENSSL_SYS_WIN16) && !defined(OPENSSL_SYS_WINCE)
     char *p;
 
     intr_signal = 0;
@@ -465,7 +478,7 @@ static int open_console(UI *ui)
     CRYPTO_w_lock(CRYPTO_LOCK_UI);
     is_a_tty = 1;
 
-#if defined(OPENSSL_SYS_VXWORKS) || defined(OPENSSL_SYS_NETWARE)
+#if defined(OPENSSL_SYS_MACINTOSH_CLASSIC) || defined(OPENSSL_SYS_VXWORKS) || defined(OPENSSL_SYS_NETWARE) || defined(OPENSSL_SYS_BEOS)
     tty_in = stdin;
     tty_out = stderr;
 #else
@@ -574,7 +587,7 @@ static int close_console(UI *ui)
     return 1;
 }
 
-#if !defined(OPENSSL_SYS_WINCE)
+#if !defined(OPENSSL_SYS_WIN16) && !defined(OPENSSL_SYS_WINCE)
 /* Internal functions to handle signals and act on them */
 static void pushsig(void)
 {
@@ -584,7 +597,7 @@ static void pushsig(void)
 # ifdef SIGACTION
     struct sigaction sa;
 
-    memset(&sa, 0, sizeof(sa));
+    memset(&sa, 0, sizeof sa);
     sa.sa_handler = recsig;
 # endif
 
@@ -658,7 +671,7 @@ static void recsig(int i)
 #endif
 
 /* Internal functions specific for Windows */
-#if defined(OPENSSL_SYS_MSDOS) && !defined(OPENSSL_SYS_WINCE)
+#if defined(OPENSSL_SYS_MSDOS) && !defined(OPENSSL_SYS_WIN16) && !defined(OPENSSL_SYS_WINCE)
 static int noecho_fgets(char *buf, int size, FILE *tty)
 {
     int i;
@@ -671,7 +684,9 @@ static int noecho_fgets(char *buf, int size, FILE *tty)
             break;
         }
         size--;
-# if defined(_WIN32)
+# ifdef WIN16TTY
+        i = _inchar();
+# elif defined(_WIN32)
         i = _getch();
 # else
         i = getch();

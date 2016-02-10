@@ -1,3 +1,4 @@
+/* crypto/pem/pem_sign.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,21 +57,21 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/rand.h>
 #include <openssl/evp.h>
 #include <openssl/objects.h>
 #include <openssl/x509.h>
 #include <openssl/pem.h>
 
-int PEM_SignInit(EVP_MD_CTX *ctx, EVP_MD *type)
+void PEM_SignInit(EVP_MD_CTX *ctx, EVP_MD *type)
 {
-    return EVP_DigestInit_ex(ctx, type, NULL);
+    EVP_DigestInit_ex(ctx, type, NULL);
 }
 
-int PEM_SignUpdate(EVP_MD_CTX *ctx, unsigned char *data, unsigned int count)
+void PEM_SignUpdate(EVP_MD_CTX *ctx, unsigned char *data, unsigned int count)
 {
-    return EVP_DigestUpdate(ctx, data, count);
+    EVP_DigestUpdate(ctx, data, count);
 }
 
 int PEM_SignFinal(EVP_MD_CTX *ctx, unsigned char *sigret,
@@ -80,7 +81,7 @@ int PEM_SignFinal(EVP_MD_CTX *ctx, unsigned char *sigret,
     int i, ret = 0;
     unsigned int m_len;
 
-    m = OPENSSL_malloc(EVP_PKEY_size(pkey) + 2);
+    m = (unsigned char *)OPENSSL_malloc(EVP_PKEY_size(pkey) + 2);
     if (m == NULL) {
         PEMerr(PEM_F_PEM_SIGNFINAL, ERR_R_MALLOC_FAILURE);
         goto err;
@@ -94,6 +95,7 @@ int PEM_SignFinal(EVP_MD_CTX *ctx, unsigned char *sigret,
     ret = 1;
  err:
     /* ctx has been zeroed by EVP_SignFinal() */
-    OPENSSL_free(m);
+    if (m != NULL)
+        OPENSSL_free(m);
     return (ret);
 }

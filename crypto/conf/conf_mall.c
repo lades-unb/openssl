@@ -1,3 +1,4 @@
+/* conf_mall.c */
 /*
  * Written by Stephen Henson (steve@openssl.org) for the OpenSSL project
  * 2001.
@@ -58,7 +59,7 @@
 
 #include <stdio.h>
 #include <openssl/crypto.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/conf.h>
 #include <openssl/dso.h>
 #include <openssl/x509.h>
@@ -73,7 +74,6 @@ void OPENSSL_load_builtin_modules(void)
 {
     /* Add builtin modules here */
     ASN1_add_oid_module();
-    ASN1_add_stable_module();
 #ifndef OPENSSL_NO_ENGINE
     ENGINE_add_conf_module();
 #endif

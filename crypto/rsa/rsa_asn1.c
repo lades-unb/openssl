@@ -1,3 +1,4 @@
+/* rsa_asn1.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 2000.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/bn.h>
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
@@ -69,7 +70,7 @@ static int rsa_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it,
 {
     if (operation == ASN1_OP_NEW_PRE) {
         *pval = (ASN1_VALUE *)RSA_new();
-        if (*pval != NULL)
+        if (*pval)
             return 2;
         return 0;
     } else if (operation == ASN1_OP_FREE_PRE) {
@@ -84,12 +85,12 @@ ASN1_SEQUENCE_cb(RSAPrivateKey, rsa_cb) = {
         ASN1_SIMPLE(RSA, version, LONG),
         ASN1_SIMPLE(RSA, n, BIGNUM),
         ASN1_SIMPLE(RSA, e, BIGNUM),
-        ASN1_SIMPLE(RSA, d, CBIGNUM),
-        ASN1_SIMPLE(RSA, p, CBIGNUM),
-        ASN1_SIMPLE(RSA, q, CBIGNUM),
-        ASN1_SIMPLE(RSA, dmp1, CBIGNUM),
-        ASN1_SIMPLE(RSA, dmq1, CBIGNUM),
-        ASN1_SIMPLE(RSA, iqmp, CBIGNUM)
+        ASN1_SIMPLE(RSA, d, BIGNUM),
+        ASN1_SIMPLE(RSA, p, BIGNUM),
+        ASN1_SIMPLE(RSA, q, BIGNUM),
+        ASN1_SIMPLE(RSA, dmp1, BIGNUM),
+        ASN1_SIMPLE(RSA, dmq1, BIGNUM),
+        ASN1_SIMPLE(RSA, iqmp, BIGNUM)
 } ASN1_SEQUENCE_END_cb(RSA, RSAPrivateKey)
 
 

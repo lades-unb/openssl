@@ -1,3 +1,4 @@
+/* crypto/rc2/rc2_cbc.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -55,7 +56,7 @@
  * [including the GNU Public Licence.]
  */
 
-#include <openssl/rc2.h>
+#include "rc2.h"
 #include "rc2_locl.h"
 
 void RC2_cbc_encrypt(const unsigned char *in, unsigned char *out, long length,

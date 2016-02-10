@@ -1,3 +1,4 @@
+/* crypto/des/ofb_enc.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -59,7 +60,7 @@
 
 /*
  * The input and output are loaded in multiples of 8 bits. What this means is
- * that if you have numbits=12 and length=2 the first 12 bits will be
+ * that if you hame numbits=12 and length=2 the first 12 bits will be
  * retrieved from the first byte and half the second.  The second 12 bits
  * will come from the 3rd and half the 4th byte.
  */

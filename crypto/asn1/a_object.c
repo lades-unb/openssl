@@ -1,3 +1,4 @@
+/* crypto/asn1/a_object.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -57,13 +58,11 @@
 
 #include <stdio.h>
 #include <limits.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/buffer.h>
 #include <openssl/asn1.h>
 #include <openssl/objects.h>
 #include <openssl/bn.h>
-#include "internal/asn1_int.h"
-#include "asn1_locl.h"
 
 int i2d_ASN1_OBJECT(ASN1_OBJECT *a, unsigned char **pp)
 {
@@ -138,9 +137,9 @@ int a2d_ASN1_OBJECT(unsigned char *out, int olen, const char *buf, int num)
             }
             if (!use_bn && l >= ((ULONG_MAX - 80) / 10L)) {
                 use_bn = 1;
-                if (bl == NULL)
+                if (!bl)
                     bl = BN_new();
-                if (bl == NULL || !BN_set_word(bl, l))
+                if (!bl || !BN_set_word(bl, l))
                     goto err;
             }
             if (use_bn) {
@@ -172,7 +171,7 @@ int a2d_ASN1_OBJECT(unsigned char *out, int olen, const char *buf, int num)
                     OPENSSL_free(tmp);
                 tmpsize = blsize + 32;
                 tmp = OPENSSL_malloc(tmpsize);
-                if (tmp == NULL)
+                if (!tmp)
                     goto err;
             }
             while (blsize--)
@@ -200,12 +199,14 @@ int a2d_ASN1_OBJECT(unsigned char *out, int olen, const char *buf, int num)
     }
     if (tmp != ftmp)
         OPENSSL_free(tmp);
-    BN_free(bl);
+    if (bl)
+        BN_free(bl);
     return (len);
  err:
     if (tmp != ftmp)
         OPENSSL_free(tmp);
-    BN_free(bl);
+    if (bl)
+        BN_free(bl);
     return (0);
 }
 
@@ -224,15 +225,12 @@ int i2a_ASN1_OBJECT(BIO *bp, ASN1_OBJECT *a)
     i = i2t_ASN1_OBJECT(buf, sizeof buf, a);
     if (i > (int)(sizeof(buf) - 1)) {
         p = OPENSSL_malloc(i + 1);
-        if (p == NULL)
+        if (!p)
             return -1;
         i2t_ASN1_OBJECT(p, i + 1, a);
     }
-    if (i <= 0) {
-        i = BIO_write(bp, "<INVALID>", 9);
-        i += BIO_dump(bp, (const char *)a->data, a->length);
-        return i;
-    }
+    if (i <= 0)
+        return BIO_write(bp, "<INVALID>", 9);
     BIO_write(bp, p, i);
     if (p != buf)
         OPENSSL_free(p);
@@ -270,7 +268,7 @@ ASN1_OBJECT *d2i_ASN1_OBJECT(ASN1_OBJECT **a, const unsigned char **pp,
 ASN1_OBJECT *c2i_ASN1_OBJECT(ASN1_OBJECT **a, const unsigned char **pp,
                              long len)
 {
-    ASN1_OBJECT *ret = NULL, tobj;
+    ASN1_OBJECT *ret = NULL;
     const unsigned char *p;
     unsigned char *data;
     int i, length;
@@ -287,29 +285,6 @@ ASN1_OBJECT *c2i_ASN1_OBJECT(ASN1_OBJECT **a, const unsigned char **pp,
     }
     /* Now 0 < len <= INT_MAX, so the cast is safe. */
     length = (int)len;
-    /*
-     * Try to lookup OID in table: these are all valid encodings so if we get
-     * a match we know the OID is valid.
-     */
-    tobj.nid = NID_undef;
-    tobj.data = p;
-    tobj.length = length;
-    tobj.flags = 0;
-    i = OBJ_obj2nid(&tobj);
-    if (i != NID_undef) {
-        /*
-         * Return shared registered OID object: this improves efficiency
-         * because we don't have to return a dynamically allocated OID
-         * and NID lookups can use the cached value.
-         */
-        ret = OBJ_nid2obj(i);
-        if (a) {
-            ASN1_OBJECT_free(*a);
-            *a = ret;
-        }
-        *pp += len;
-        return ret;
-    }
     for (i = 0; i < length; i++, p++) {
         if (*p == 0x80 && (!i || !(p[-1] & 0x80))) {
             ASN1err(ASN1_F_C2I_ASN1_OBJECT, ASN1_R_INVALID_OBJECT_ENCODING);
@@ -335,8 +310,9 @@ ASN1_OBJECT *c2i_ASN1_OBJECT(ASN1_OBJECT **a, const unsigned char **pp,
     /* once detached we can change it */
     if ((data == NULL) || (ret->length < length)) {
         ret->length = 0;
-        OPENSSL_free(data);
-        data = OPENSSL_malloc(length);
+        if (data != NULL)
+            OPENSSL_free(data);
+        data = (unsigned char *)OPENSSL_malloc(length);
         if (data == NULL) {
             i = ERR_R_MALLOC_FAILURE;
             goto err;
@@ -358,7 +334,7 @@ ASN1_OBJECT *c2i_ASN1_OBJECT(ASN1_OBJECT **a, const unsigned char **pp,
     return (ret);
  err:
     ASN1err(ASN1_F_C2I_ASN1_OBJECT, i);
-    if ((a == NULL) || (*a != ret))
+    if ((ret != NULL) && ((a == NULL) || (*a != ret)))
         ASN1_OBJECT_free(ret);
     return (NULL);
 }
@@ -367,11 +343,16 @@ ASN1_OBJECT *ASN1_OBJECT_new(void)
 {
     ASN1_OBJECT *ret;
 
-    ret = OPENSSL_zalloc(sizeof(*ret));
+    ret = (ASN1_OBJECT *)OPENSSL_malloc(sizeof(ASN1_OBJECT));
     if (ret == NULL) {
         ASN1err(ASN1_F_ASN1_OBJECT_NEW, ERR_R_MALLOC_FAILURE);
         return (NULL);
     }
+    ret->length = 0;
+    ret->data = NULL;
+    ret->nid = 0;
+    ret->sn = NULL;
+    ret->ln = NULL;
     ret->flags = ASN1_OBJECT_FLAG_DYNAMIC;
     return (ret);
 }
@@ -384,13 +365,16 @@ void ASN1_OBJECT_free(ASN1_OBJECT *a)
 #ifndef CONST_STRICT            /* disable purely for compile-time strict
                                  * const checking. Doing this on a "real"
                                  * compile will cause memory leaks */
-        OPENSSL_free((void*)a->sn);
-        OPENSSL_free((void*)a->ln);
+        if (a->sn != NULL)
+            OPENSSL_free((void *)a->sn);
+        if (a->ln != NULL)
+            OPENSSL_free((void *)a->ln);
 #endif
         a->sn = a->ln = NULL;
     }
     if (a->flags & ASN1_OBJECT_FLAG_DYNAMIC_DATA) {
-        OPENSSL_free((void*)a->data);
+        if (a->data != NULL)
+            OPENSSL_free((void *)a->data);
         a->data = NULL;
         a->length = 0;
     }
@@ -412,3 +396,7 @@ ASN1_OBJECT *ASN1_OBJECT_create(int nid, unsigned char *data, int len,
         ASN1_OBJECT_FLAG_DYNAMIC_DATA;
     return (OBJ_dup(&o));
 }
+
+IMPLEMENT_STACK_OF(ASN1_OBJECT)
+
+IMPLEMENT_ASN1_SET_OF(ASN1_OBJECT)

@@ -1,3 +1,4 @@
+/* crypto/evp/p_open.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,7 +57,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 
 #ifndef OPENSSL_NO_RSA
 
@@ -73,7 +74,7 @@ int EVP_OpenInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
     int i, size = 0, ret = 0;
 
     if (type) {
-        EVP_CIPHER_CTX_reset(ctx);
+        EVP_CIPHER_CTX_init(ctx);
         if (!EVP_DecryptInit_ex(ctx, type, NULL, NULL, NULL))
             return 0;
     }
@@ -81,13 +82,13 @@ int EVP_OpenInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
     if (!priv)
         return 1;
 
-    if (EVP_PKEY_id(priv) != EVP_PKEY_RSA) {
+    if (priv->type != EVP_PKEY_RSA) {
         EVPerr(EVP_F_EVP_OPENINIT, EVP_R_PUBLIC_KEY_NOT_RSA);
         goto err;
     }
 
-    size = EVP_PKEY_size(priv);
-    key = OPENSSL_malloc(size + 2);
+    size = RSA_size(priv->pkey.rsa);
+    key = (unsigned char *)OPENSSL_malloc(size + 2);
     if (key == NULL) {
         /* ERROR */
         EVPerr(EVP_F_EVP_OPENINIT, ERR_R_MALLOC_FAILURE);
@@ -104,7 +105,9 @@ int EVP_OpenInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
 
     ret = 1;
  err:
-    OPENSSL_clear_free(key, size);
+    if (key != NULL)
+        OPENSSL_cleanse(key, size);
+    OPENSSL_free(key);
     return (ret);
 }
 

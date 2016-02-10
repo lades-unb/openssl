@@ -37,23 +37,35 @@ ASN1_VALUE *PADES_read_ASN1(BIO *bio, const ASN1_ITEM *it)
 			}
 		}
 		BIO_set_mem_eof_return(asnin, 0);
-	}
-	else if ((bio->method)->type == BIO_TYPE_MEM) asnin = bio;
-	else {
-		ASN1err(ASN1_F_PADES_READ_ASN1, ASN1_R_ILLEGAL_BIO_TYPE);
-		return NULL;
-	}
 
-	/* Read in ASN1 */
-	if (!(val = b64_read_asn1_frontend(asnin, it))) {
-		ASN1err(ASN1_F_PADES_READ_ASN1, ASN1_R_ASN1_SIG_PARSE_ERROR);
-		return NULL;
-	}
+		if (!(val = b64_read_asn1_frontend(asnin, it))) {
+			ASN1err(ASN1_F_PADES_READ_ASN1, ASN1_R_ASN1_SIG_PARSE_ERROR);
+			return NULL;
+		}
 
-	if ((bio->method)->type == BIO_TYPE_FILE)
 		BIO_free(asnin);
 
-	return val;
+		return val;
+	}
+	else 
+		if ((bio->method)->type == BIO_TYPE_MEM) {
+			asnin = bio;
+
+			/* Check if ASN1 data is base 64, then read and decode ASN1 accordingly */
+			if (Pades_ASN1_Data_is_B64((BUF_MEM *) bio->ptr))
+				val = b64_read_asn1_frontend(asnin, it);
+			else val = ASN1_item_d2i_bio(it, bio, NULL);
+			if (!val) {
+				ASN1err(ASN1_F_PADES_READ_ASN1, ASN1_R_ASN1_SIG_PARSE_ERROR);
+				return NULL;
+			}
+
+			return val;
+		}
+		else {
+			ASN1err(ASN1_F_PADES_READ_ASN1, ASN1_R_ILLEGAL_BIO_TYPE);
+			return NULL;
+		 }
 }
 
 int PADES_write_ASN1(BIO *bio, ASN1_VALUE *val, BIO *data, int flags,
@@ -93,4 +105,36 @@ int PADES_write_ASN1(BIO *bio, ASN1_VALUE *val, BIO *data, int flags,
 		return 0;
 
 	return 1;
+}
+
+/***********************************************************************************************************
+*
+* This function verifies whether a given byte string contained in 
+* the memory buffer "buf" is written in Base 64 format or not.
+*
+* It uses the "Super Light Regular Expression" (slre) code written
+* by Sergey Lyubka, which is freeware.
+*
+************************************************************************************************************/
+
+int Pades_ASN1_Data_is_B64(BUF_MEM *buf)   {
+
+	// Regular expression that represents Base 64 syntax
+	char *b64_regexp = "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)$";
+
+	struct slre	slre;
+	struct cap	caps[20];
+	int    res = B64_NON_MATCH;
+
+
+	if (!slre_compile(&slre, b64_regexp)) {
+		printf("Error compiling slre: %s\n", slre.err_str);
+		return (B64_ERROR);
+	}
+	
+	res = slre_match(&slre, buf->data, buf->length, caps);
+
+	if (res) return (B64_MATCH);
+	else     return(B64_NON_MATCH);
+
 }

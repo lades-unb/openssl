@@ -1,3 +1,4 @@
+/* crypto/rand/rand_os2.c */
 /* ====================================================================
  * Copyright (c) 1998-2000 The OpenSSL Project.  All rights reserved.
  *
@@ -52,7 +53,7 @@
  *
  */
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/rand.h>
 #include "rand_lcl.h"
 
@@ -148,7 +149,7 @@ int RAND_poll(void)
     if (DosQuerySysState) {
         char *buffer = OPENSSL_malloc(256 * 1024);
 
-        if (buffer == NULL)
+        if (!buffer)
             return 0;
 
         if (DosQuerySysState(0x1F, 0, 0, 0, buffer, 256 * 1024) == 0) {

@@ -1,3 +1,4 @@
+/* crypto/evp/c_all.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,10 +57,19 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/evp.h>
 #ifndef OPENSSL_NO_ENGINE
 # include <openssl/engine.h>
+#endif
+
+#if 0
+# undef OpenSSL_add_all_algorithms
+
+void OpenSSL_add_all_algorithms(void)
+{
+    OPENSSL_add_all_algorithms_noconf();
+}
 #endif
 
 void OPENSSL_add_all_algorithms_noconf(void)

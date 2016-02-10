@@ -1,3 +1,4 @@
+/* crypto/o_dir.c -*- mode:C; c-file-style: "eay" -*- */
 /*
  * Written by Richard Levitte (richard@levitte.org) for the OpenSSL project
  * 2004.
@@ -69,7 +70,7 @@
 #define LP_find_file OPENSSL_DIR_read
 #define LP_find_file_end OPENSSL_DIR_end
 
-#include "internal/o_dir.h"
+#include "o_dir.h"
 
 #define LPDIR_H
 #if defined OPENSSL_SYS_UNIX || defined DJGPP

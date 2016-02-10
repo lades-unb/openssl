@@ -1,3 +1,4 @@
+/* v3_genn.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/asn1t.h>
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
@@ -228,7 +229,7 @@ int GENERAL_NAME_set0_othername(GENERAL_NAME *gen,
 {
     OTHERNAME *oth;
     oth = OTHERNAME_new();
-    if (oth == NULL)
+    if (!oth)
         return 0;
     oth->type_id = oid;
     oth->value = value;

@@ -1,3 +1,4 @@
+/* crypto/cms/cms_lib.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
@@ -57,11 +58,16 @@
 #include <openssl/pem.h>
 #include <openssl/bio.h>
 #include <openssl/asn1.h>
-#include <openssl/cms.h>
+#include "cms.h"
 #include "cms_lcl.h"
 
 IMPLEMENT_ASN1_FUNCTIONS(CMS_ContentInfo)
 IMPLEMENT_ASN1_PRINT_FUNCTION(CMS_ContentInfo)
+
+DECLARE_ASN1_ITEM(CMS_CertificateChoices)
+DECLARE_ASN1_ITEM(CMS_RevocationInfoChoice)
+DECLARE_STACK_OF(CMS_CertificateChoices)
+DECLARE_STACK_OF(CMS_RevocationInfoChoice)
 
 const ASN1_OBJECT *CMS_get0_type(CMS_ContentInfo *cms)
 {
@@ -72,7 +78,7 @@ CMS_ContentInfo *cms_Data_create(void)
 {
     CMS_ContentInfo *cms;
     cms = CMS_ContentInfo_new();
-    if (cms != NULL) {
+    if (cms) {
         cms->contentType = OBJ_nid2obj(NID_pkcs7_data);
         /* Never detached */
         CMS_set_detached(cms, 0);
@@ -153,7 +159,7 @@ int CMS_dataFinal(CMS_ContentInfo *cms, BIO *cmsbio)
     ASN1_OCTET_STRING **pos = CMS_get0_content(cms);
     if (!pos)
         return 0;
-    /* If embedded content find memory BIO and set content */
+    /* If ebmedded content find memory BIO and set content */
     if (*pos && ((*pos)->flags & ASN1_STRING_FLAG_CONT)) {
         BIO *mbio;
         unsigned char *cont;
@@ -308,13 +314,15 @@ int CMS_set_detached(CMS_ContentInfo *cms, int detached)
     if (!pos)
         return 0;
     if (detached) {
-        ASN1_OCTET_STRING_free(*pos);
-        *pos = NULL;
+        if (*pos) {
+            ASN1_OCTET_STRING_free(*pos);
+            *pos = NULL;
+        }
         return 1;
     }
-    if (*pos == NULL)
+    if (!*pos)
         *pos = ASN1_OCTET_STRING_new();
-    if (*pos != NULL) {
+    if (*pos) {
         /*
          * NB: special flag to show content is created and not read in.
          */
@@ -323,6 +331,21 @@ int CMS_set_detached(CMS_ContentInfo *cms, int detached)
     }
     CMSerr(CMS_F_CMS_SET_DETACHED, ERR_R_MALLOC_FAILURE);
     return 0;
+}
+
+/* Set up an X509_ALGOR DigestAlgorithmIdentifier from an EVP_MD */
+
+void cms_DigestAlgorithm_set(X509_ALGOR *alg, const EVP_MD *md)
+{
+    int param_type;
+
+    if (md->flags & EVP_MD_FLAG_DIGALGID_ABSENT)
+        param_type = V_ASN1_UNDEF;
+    else
+        param_type = V_ASN1_NULL;
+
+    X509_ALGOR_set0(alg, OBJ_nid2obj(EVP_MD_type(md)), param_type, NULL);
+
 }
 
 /* Create a digest BIO from an X509_ALGOR structure */
@@ -340,13 +363,14 @@ BIO *cms_DigestAlgorithm_init_bio(X509_ALGOR *digestAlgorithm)
         goto err;
     }
     mdbio = BIO_new(BIO_f_md());
-    if (mdbio == NULL || !BIO_set_md(mdbio, digest)) {
+    if (!mdbio || !BIO_set_md(mdbio, digest)) {
         CMSerr(CMS_F_CMS_DIGESTALGORITHM_INIT_BIO, CMS_R_MD_BIO_INIT_ERROR);
         goto err;
     }
     return mdbio;
  err:
-    BIO_free(mdbio);
+    if (mdbio)
+        BIO_free(mdbio);
     return NULL;
 }
 
@@ -451,7 +475,7 @@ int CMS_add1_cert(CMS_ContentInfo *cms, X509 *cert)
     int r;
     r = CMS_add0_cert(cms, cert);
     if (r > 0)
-        X509_up_ref(cert);
+        CRYPTO_add(&cert->references, 1, CRYPTO_LOCK_X509);
     return r;
 }
 
@@ -511,7 +535,7 @@ int CMS_add1_crl(CMS_ContentInfo *cms, X509_CRL *crl)
     int r;
     r = CMS_add0_crl(cms, crl);
     if (r > 0)
-        X509_CRL_up_ref(crl);
+        CRYPTO_add(&crl->references, 1, CRYPTO_LOCK_X509_CRL);
     return r;
 }
 
@@ -536,7 +560,7 @@ STACK_OF(X509) *CMS_get1_certs(CMS_ContentInfo *cms)
                 sk_X509_pop_free(certs, X509_free);
                 return NULL;
             }
-            X509_up_ref(cch->d.certificate);
+            CRYPTO_add(&cch->d.certificate->references, 1, CRYPTO_LOCK_X509);
         }
     }
     return certs;
@@ -564,7 +588,7 @@ STACK_OF(X509_CRL) *CMS_get1_crls(CMS_ContentInfo *cms)
                 sk_X509_CRL_pop_free(crls, X509_CRL_free);
                 return NULL;
             }
-            X509_CRL_up_ref(rch->d.crl);
+            CRYPTO_add(&rch->d.crl->references, 1, CRYPTO_LOCK_X509_CRL);
         }
     }
     return crls;
@@ -581,11 +605,10 @@ int cms_ias_cert_cmp(CMS_IssuerAndSerialNumber *ias, X509 *cert)
 
 int cms_keyid_cert_cmp(ASN1_OCTET_STRING *keyid, X509 *cert)
 {
-    const ASN1_OCTET_STRING *cert_keyid = X509_get0_subject_key_id(cert);
-
-    if (cert_keyid == NULL)
+    X509_check_purpose(cert, -1, -1);
+    if (!cert->skid)
         return -1;
-    return ASN1_OCTET_STRING_cmp(keyid, cert_keyid);
+    return ASN1_OCTET_STRING_cmp(keyid, cert->skid);
 }
 
 int cms_set1_ias(CMS_IssuerAndSerialNumber **pias, X509 *cert)
@@ -598,11 +621,13 @@ int cms_set1_ias(CMS_IssuerAndSerialNumber **pias, X509 *cert)
         goto err;
     if (!ASN1_STRING_copy(ias->serialNumber, X509_get_serialNumber(cert)))
         goto err;
-    M_ASN1_free_of(*pias, CMS_IssuerAndSerialNumber);
+    if (*pias)
+        M_ASN1_free_of(*pias, CMS_IssuerAndSerialNumber);
     *pias = ias;
     return 1;
  err:
-    M_ASN1_free_of(ias, CMS_IssuerAndSerialNumber);
+    if (ias)
+        M_ASN1_free_of(ias, CMS_IssuerAndSerialNumber);
     CMSerr(CMS_F_CMS_SET1_IAS, ERR_R_MALLOC_FAILURE);
     return 0;
 }
@@ -610,18 +635,18 @@ int cms_set1_ias(CMS_IssuerAndSerialNumber **pias, X509 *cert)
 int cms_set1_keyid(ASN1_OCTET_STRING **pkeyid, X509 *cert)
 {
     ASN1_OCTET_STRING *keyid = NULL;
-    const ASN1_OCTET_STRING *cert_keyid;
-    cert_keyid = X509_get0_subject_key_id(cert);
-    if (cert_keyid == NULL) {
+    X509_check_purpose(cert, -1, -1);
+    if (!cert->skid) {
         CMSerr(CMS_F_CMS_SET1_KEYID, CMS_R_CERTIFICATE_HAS_NO_KEYID);
         return 0;
     }
-    keyid = ASN1_STRING_dup(cert_keyid);
+    keyid = ASN1_STRING_dup(cert->skid);
     if (!keyid) {
         CMSerr(CMS_F_CMS_SET1_KEYID, ERR_R_MALLOC_FAILURE);
         return 0;
     }
-    ASN1_OCTET_STRING_free(*pkeyid);
+    if (*pkeyid)
+        ASN1_OCTET_STRING_free(*pkeyid);
     *pkeyid = keyid;
     return 1;
 }

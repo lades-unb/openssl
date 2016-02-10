@@ -62,14 +62,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/conf.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/buffer.h>
 #include <openssl/x509v3.h>
-#include "internal/x509_int.h"
-#include "ext_dat.h"
 
 #ifndef OPENSSL_NO_RFC3779
 
@@ -100,7 +98,7 @@ ASN1_SEQUENCE(IPAddressFamily) = {
 ASN1_ITEM_TEMPLATE(IPAddrBlocks) =
   ASN1_EX_TEMPLATE_TYPE(ASN1_TFLG_SEQUENCE_OF, 0,
                         IPAddrBlocks, IPAddressFamily)
-static_ASN1_ITEM_TEMPLATE_END(IPAddrBlocks)
+ASN1_ITEM_TEMPLATE_END(IPAddrBlocks)
 
 IMPLEMENT_ASN1_FUNCTIONS(IPAddressRange)
 IMPLEMENT_ASN1_FUNCTIONS(IPAddressOrRange)
@@ -110,7 +108,7 @@ IMPLEMENT_ASN1_FUNCTIONS(IPAddressFamily)
 /*
  * How much buffer space do we need for a raw address?
  */
-#define ADDR_RAW_BUF_LEN        16
+# define ADDR_RAW_BUF_LEN        16
 
 /*
  * What's the address length associated with this AFI?
@@ -165,7 +163,7 @@ static int addr_expand(unsigned char *addr,
 /*
  * Extract the prefix length from a bitstring.
  */
-#define addr_prefixlen(bs) ((int) ((bs)->length * 8 - ((bs)->flags & 7)))
+# define addr_prefixlen(bs) ((int) ((bs)->length * 8 - ((bs)->flags & 7)))
 
 /*
  * i2r handler for one address bitstring.
@@ -360,7 +358,7 @@ static int IPAddressOrRange_cmp(const IPAddressOrRange *a,
 
 /*
  * IPv4-specific closure over IPAddressOrRange_cmp, since sk_sort()
- * comparison routines are only allowed two arguments.
+ * comparision routines are only allowed two arguments.
  */
 static int v4IPAddressOrRange_cmp(const IPAddressOrRange *const *a,
                                   const IPAddressOrRange *const *b)
@@ -370,7 +368,7 @@ static int v4IPAddressOrRange_cmp(const IPAddressOrRange *const *a,
 
 /*
  * IPv6-specific closure over IPAddressOrRange_cmp, since sk_sort()
- * comparison routines are only allowed two arguments.
+ * comparision routines are only allowed two arguments.
  */
 static int v6IPAddressOrRange_cmp(const IPAddressOrRange *const *a,
                                   const IPAddressOrRange *const *b)
@@ -530,7 +528,7 @@ static IPAddressFamily *make_IPAddressFamily(IPAddrBlocks *addr,
 {
     IPAddressFamily *f;
     unsigned char key[3];
-    int keylen;
+    unsigned keylen;
     int i;
 
     key[0] = (afi >> 8) & 0xFF;
@@ -704,7 +702,7 @@ int v3_addr_get_range(IPAddressOrRange *aor,
 }
 
 /*
- * Sort comparison function for a sequence of IPAddressFamily.
+ * Sort comparision function for a sequence of IPAddressFamily.
  *
  * The last paragraph of RFC 3779 2.2.3.3 is slightly ambiguous about
  * the ordering: I can read it as meaning that IPv6 without a SAFI
@@ -948,7 +946,7 @@ static void *v2i_IPAddrBlocks(const struct v3_ext_method *method,
         CONF_VALUE *val = sk_CONF_VALUE_value(values, i);
         unsigned char min[ADDR_RAW_BUF_LEN], max[ADDR_RAW_BUF_LEN];
         unsigned afi, *safi = NULL, safi_;
-        const char *addr_chars = NULL;
+        const char *addr_chars;
         int prefixlen, i1, i2, delim, length;
 
         if (!name_cmp(val->name, "IPv4")) {
@@ -980,7 +978,7 @@ static void *v2i_IPAddrBlocks(const struct v3_ext_method *method,
         length = length_from_afi(afi);
 
         /*
-         * Handle SAFI, if any, and OPENSSL_strdup() so we can null-terminate
+         * Handle SAFI, if any, and BUF_strdup() so we can null-terminate
          * the other input values.
          */
         if (safi != NULL) {
@@ -992,9 +990,9 @@ static void *v2i_IPAddrBlocks(const struct v3_ext_method *method,
                 goto err;
             }
             t += strspn(t, " \t");
-            s = OPENSSL_strdup(t);
+            s = BUF_strdup(t);
         } else {
-            s = OPENSSL_strdup(val->value);
+            s = BUF_strdup(val->value);
         }
         if (s == NULL) {
             X509V3err(X509V3_F_V2I_IPADDRBLOCKS, ERR_R_MALLOC_FAILURE);
@@ -1005,7 +1003,7 @@ static void *v2i_IPAddrBlocks(const struct v3_ext_method *method,
          * Check for inheritance.  Not worth additional complexity to
          * optimize this (seldom-used) case.
          */
-        if (strcmp(s, "inherit") == 0) {
+        if (!strcmp(s, "inherit")) {
             if (!v3_addr_add_inherit(addr, afi, safi)) {
                 X509V3err(X509V3_F_V2I_IPADDRBLOCKS,
                           X509V3_R_INVALID_INHERITANCE);
@@ -1197,7 +1195,7 @@ int v3_addr_subset(IPAddrBlocks *a, IPAddrBlocks *b)
 /*
  * Validation error handling via callback.
  */
-#define validation_err(_err_)           \
+# define validation_err(_err_)           \
   do {                                  \
     if (ctx != NULL) {                  \
       ctx->error = _err_;               \
@@ -1317,7 +1315,7 @@ static int v3_addr_validate_path_internal(X509_STORE_CTX *ctx,
     return ret;
 }
 
-#undef validation_err
+# undef validation_err
 
 /*
  * RFC 3779 2.3 path validation -- called from X509_verify_cert().

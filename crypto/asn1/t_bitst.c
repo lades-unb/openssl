@@ -1,3 +1,4 @@
+/* t_bitst.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
 
@@ -97,8 +98,7 @@ int ASN1_BIT_STRING_num_asc(char *name, BIT_STRING_BITNAME *tbl)
 {
     BIT_STRING_BITNAME *bnam;
     for (bnam = tbl; bnam->lname; bnam++) {
-        if ((strcmp(bnam->sname, name) == 0)
-            || (strcmp(bnam->lname, name) == 0))
+        if (!strcmp(bnam->sname, name) || !strcmp(bnam->lname, name))
             return bnam->bitnum;
     }
     return -1;

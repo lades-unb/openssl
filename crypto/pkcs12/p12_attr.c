@@ -1,3 +1,4 @@
+/* p12_attr.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/pkcs12.h>
 
 /* Add a local keyid to a safebag */
@@ -120,16 +121,24 @@ ASN1_TYPE *PKCS12_get_attr_gen(STACK_OF(X509_ATTRIBUTE) *attrs, int attr_nid)
 {
     X509_ATTRIBUTE *attrib;
     int i;
-    i = X509at_get_attr_by_NID(attrs, attr_nid, -1);
-    attrib = X509at_get_attr(attrs, i);
-    return X509_ATTRIBUTE_get0_type(attrib, 0);
+    if (!attrs)
+        return NULL;
+    for (i = 0; i < sk_X509_ATTRIBUTE_num(attrs); i++) {
+        attrib = sk_X509_ATTRIBUTE_value(attrs, i);
+        if (OBJ_obj2nid(attrib->object) == attr_nid) {
+            if (sk_ASN1_TYPE_num(attrib->value.set))
+                return sk_ASN1_TYPE_value(attrib->value.set, 0);
+            else
+                return NULL;
+        }
+    }
+    return NULL;
 }
 
 char *PKCS12_get_friendlyname(PKCS12_SAFEBAG *bag)
 {
     ASN1_TYPE *atype;
-
-    if ((atype = PKCS12_get_attr(bag, NID_friendlyName)) == NULL)
+    if (!(atype = PKCS12_get_attr(bag, NID_friendlyName)))
         return NULL;
     if (atype->type != V_ASN1_BMPSTRING)
         return NULL;

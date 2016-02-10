@@ -1,3 +1,4 @@
+/* crypto/bio/bss_bio.c  -*- Mode: C; c-file-style: "eay" -*- */
 /* ====================================================================
  * Copyright (c) 1998-2003 The OpenSSL Project.  All rights reserved.
  *
@@ -143,7 +144,7 @@ static int bio_new(BIO *bio)
 {
     struct bio_bio_st *b;
 
-    b = OPENSSL_malloc(sizeof(*b));
+    b = OPENSSL_malloc(sizeof *b);
     if (b == NULL)
         return 0;
 
@@ -169,7 +170,10 @@ static int bio_free(BIO *bio)
     if (b->peer)
         bio_destroy_pair(bio);
 
-    OPENSSL_free(b->buf);
+    if (b->buf != NULL) {
+        OPENSSL_free(b->buf);
+    }
+
     OPENSSL_free(b);
 
     return 1;
@@ -503,8 +507,10 @@ static long bio_ctrl(BIO *bio, int cmd, long num, void *ptr)
             size_t new_size = num;
 
             if (b->size != new_size) {
-                OPENSSL_free(b->buf);
-                b->buf = NULL;
+                if (b->buf) {
+                    OPENSSL_free(b->buf);
+                    b->buf = NULL;
+                }
                 b->size = new_size;
             }
             ret = 1;
@@ -782,10 +788,14 @@ int BIO_new_bio_pair(BIO **bio1_p, size_t writebuf1,
 
  err:
     if (ret == 0) {
-        BIO_free(bio1);
-        bio1 = NULL;
-        BIO_free(bio2);
-        bio2 = NULL;
+        if (bio1) {
+            BIO_free(bio1);
+            bio1 = NULL;
+        }
+        if (bio2) {
+            BIO_free(bio2);
+            bio2 = NULL;
+        }
     }
 
     *bio1_p = bio1;

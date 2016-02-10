@@ -1,3 +1,4 @@
+/* dso_win32.c -*- mode:C; c-file-style: "eay" -*- */
 /*
  * Written by Geoff Thorpe (geoff@geoffthorpe.net) for the OpenSSL project
  * 2000.
@@ -58,7 +59,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/dso.h>
 
 #if !defined(DSO_WIN32)
@@ -118,6 +119,13 @@ static int win32_load(DSO *dso);
 static int win32_unload(DSO *dso);
 static void *win32_bind_var(DSO *dso, const char *symname);
 static DSO_FUNC_TYPE win32_bind_func(DSO *dso, const char *symname);
+# if 0
+static int win32_unbind_var(DSO *dso, char *symname, void *symptr);
+static int win32_unbind_func(DSO *dso, char *symname, DSO_FUNC_TYPE symptr);
+static int win32_init(DSO *dso);
+static int win32_finish(DSO *dso);
+static long win32_ctrl(DSO *dso, int cmd, long larg, void *parg);
+# endif
 static char *win32_name_converter(DSO *dso, const char *filename);
 static char *win32_merger(DSO *dso, const char *filespec1,
                           const char *filespec2);
@@ -132,6 +140,11 @@ static DSO_METHOD dso_meth_win32 = {
     win32_unload,
     win32_bind_var,
     win32_bind_func,
+/* For now, "unbind" doesn't exist */
+# if 0
+    NULL,                       /* unbind_var */
+    NULL,                       /* unbind_func */
+# endif
     NULL,                       /* ctrl */
     win32_name_converter,
     win32_merger,
@@ -167,7 +180,7 @@ static int win32_load(DSO *dso)
         ERR_add_error_data(3, "filename(", filename, ")");
         goto err;
     }
-    p = OPENSSL_malloc(sizeof(*p));
+    p = (HINSTANCE *) OPENSSL_malloc(sizeof(HINSTANCE));
     if (p == NULL) {
         DSOerr(DSO_F_WIN32_LOAD, ERR_R_MALLOC_FAILURE);
         goto err;
@@ -182,8 +195,10 @@ static int win32_load(DSO *dso)
     return (1);
  err:
     /* Cleanup ! */
-    OPENSSL_free(filename);
-    OPENSSL_free(p);
+    if (filename != NULL)
+        OPENSSL_free(filename);
+    if (p != NULL)
+        OPENSSL_free(p);
     if (h != NULL)
         FreeLibrary(h);
     return (0);
@@ -223,10 +238,7 @@ static int win32_unload(DSO *dso)
 static void *win32_bind_var(DSO *dso, const char *symname)
 {
     HINSTANCE *ptr;
-    union {
-        void *p;
-        FARPROC f;
-    } sym;
+    void *sym;
 
     if ((dso == NULL) || (symname == NULL)) {
         DSOerr(DSO_F_WIN32_BIND_VAR, ERR_R_PASSED_NULL_PARAMETER);
@@ -241,22 +253,19 @@ static void *win32_bind_var(DSO *dso, const char *symname)
         DSOerr(DSO_F_WIN32_BIND_VAR, DSO_R_NULL_HANDLE);
         return (NULL);
     }
-    sym.f = GetProcAddress(*ptr, symname);
-    if (sym.p == NULL) {
+    sym = GetProcAddress(*ptr, symname);
+    if (sym == NULL) {
         DSOerr(DSO_F_WIN32_BIND_VAR, DSO_R_SYM_FAILURE);
         ERR_add_error_data(3, "symname(", symname, ")");
         return (NULL);
     }
-    return (sym.p);
+    return (sym);
 }
 
 static DSO_FUNC_TYPE win32_bind_func(DSO *dso, const char *symname)
 {
     HINSTANCE *ptr;
-    union {
-        void *p;
-        FARPROC f;
-    } sym;
+    void *sym;
 
     if ((dso == NULL) || (symname == NULL)) {
         DSOerr(DSO_F_WIN32_BIND_FUNC, ERR_R_PASSED_NULL_PARAMETER);
@@ -271,13 +280,13 @@ static DSO_FUNC_TYPE win32_bind_func(DSO *dso, const char *symname)
         DSOerr(DSO_F_WIN32_BIND_FUNC, DSO_R_NULL_HANDLE);
         return (NULL);
     }
-    sym.f = GetProcAddress(*ptr, symname);
-    if (sym.p == NULL) {
+    sym = GetProcAddress(*ptr, symname);
+    if (sym == NULL) {
         DSOerr(DSO_F_WIN32_BIND_FUNC, DSO_R_SYM_FAILURE);
         ERR_add_error_data(3, "symname(", symname, ")");
         return (NULL);
     }
-    return ((DSO_FUNC_TYPE)sym.f);
+    return ((DSO_FUNC_TYPE)sym);
 }
 
 struct file_st {
@@ -309,12 +318,13 @@ static struct file_st *win32_splitter(DSO *dso, const char *filename,
         return (NULL);
     }
 
-    result = OPENSSL_zalloc(sizeof(*result));
+    result = OPENSSL_malloc(sizeof(struct file_st));
     if (result == NULL) {
         DSOerr(DSO_F_WIN32_SPLITTER, ERR_R_MALLOC_FAILURE);
         return (NULL);
     }
 
+    memset(result, 0, sizeof(struct file_st));
     position = IN_DEVICE;
 
     if ((filename[0] == '\\' && filename[1] == '\\')
@@ -432,7 +442,7 @@ static char *win32_joiner(DSO *dso, const struct file_st *file_split)
     }
 
     result = OPENSSL_malloc(len + 1);
-    if (result == NULL) {
+    if (!result) {
         DSOerr(DSO_F_WIN32_JOINER, ERR_R_MALLOC_FAILURE);
         return (NULL);
     }
@@ -466,6 +476,13 @@ static char *win32_joiner(DSO *dso, const struct file_st *file_split)
         offset++;
         start = end + 1;
     }
+# if 0                          /* Not needed, since the directory converter
+                                 * above already appeneded a backslash */
+    if (file_split->predir && (file_split->dir || file_split->file)) {
+        result[offset] = '\\';
+        offset++;
+    }
+# endif
     start = file_split->dir;
     while (file_split->dirlen > (start - file_split->dir)) {
         const char *end = openssl_strnchr(start, '/',
@@ -479,6 +496,13 @@ static char *win32_joiner(DSO *dso, const struct file_st *file_split)
         offset++;
         start = end + 1;
     }
+# if 0                          /* Not needed, since the directory converter
+                                 * above already appeneded a backslash */
+    if (file_split->dir && file_split->file) {
+        result[offset] = '\\';
+        offset++;
+    }
+# endif
     strncpy(&result[offset], file_split->file, file_split->filelen);
     offset += file_split->filelen;
     result[offset] = '\0';
@@ -498,14 +522,14 @@ static char *win32_merger(DSO *dso, const char *filespec1,
     }
     if (!filespec2) {
         merged = OPENSSL_malloc(strlen(filespec1) + 1);
-        if (merged == NULL) {
+        if (!merged) {
             DSOerr(DSO_F_WIN32_MERGER, ERR_R_MALLOC_FAILURE);
             return (NULL);
         }
         strcpy(merged, filespec1);
     } else if (!filespec1) {
         merged = OPENSSL_malloc(strlen(filespec2) + 1);
-        if (merged == NULL) {
+        if (!merged) {
             DSOerr(DSO_F_WIN32_MERGER, ERR_R_MALLOC_FAILURE);
             return (NULL);
         }
@@ -709,10 +733,7 @@ static void *win32_globallookup(const char *name)
     CREATETOOLHELP32SNAPSHOT create_snap;
     CLOSETOOLHELP32SNAPSHOT close_snap;
     MODULE32 module_first, module_next;
-    union {
-        void *p;
-        FARPROC f;
-    } ret = { NULL };
+    FARPROC ret = NULL;
 
     dll = LoadLibrary(TEXT(DLLNAME));
     if (dll == NULL) {
@@ -753,10 +774,10 @@ static void *win32_globallookup(const char *name)
     }
 
     do {
-        if ((ret.f = GetProcAddress(me32.hModule, name))) {
+        if ((ret = GetProcAddress(me32.hModule, name))) {
             (*close_snap) (hModuleSnap);
             FreeLibrary(dll);
-            return ret.p;
+            return ret;
         }
     } while ((*module_next) (hModuleSnap, &me32));
 

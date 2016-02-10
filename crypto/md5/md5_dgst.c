@@ -1,3 +1,4 @@
+/* crypto/md5/md5_dgst.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -58,6 +59,9 @@
 #include <stdio.h>
 #include "md5_locl.h"
 #include <openssl/opensslv.h>
+#include <openssl/crypto.h>
+
+const char MD5_version[] = "MD5" OPENSSL_VERSION_PTEXT;
 
 /*
  * Implemented from RFC1321 The MD5 Message-Digest Algorithm
@@ -68,7 +72,7 @@
 #define INIT_DATA_C (unsigned long)0x98badcfeL
 #define INIT_DATA_D (unsigned long)0x10325476L
 
-int MD5_Init(MD5_CTX *c)
+fips_md_init(MD5)
 {
     memset(c, 0, sizeof(*c));
     c->A = INIT_DATA_A;

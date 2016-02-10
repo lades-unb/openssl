@@ -1,3 +1,4 @@
+/* crypto/evp/e_rc5.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,12 +57,11 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 
 #ifndef OPENSSL_NO_RC5
 
 # include <openssl/evp.h>
-# include <internal/evp_int.h>
 # include <openssl/objects.h>
 # include "evp_locl.h"
 # include <openssl/rc5.h>

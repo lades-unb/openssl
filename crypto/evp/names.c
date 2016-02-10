@@ -1,3 +1,4 @@
+/* crypto/evp/names.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,11 +57,10 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/evp.h>
 #include <openssl/objects.h>
 #include <openssl/x509.h>
-#include "internal/evp_int.h"
 
 int EVP_add_cipher(const EVP_CIPHER *c)
 {
@@ -68,6 +68,8 @@ int EVP_add_cipher(const EVP_CIPHER *c)
 
     if (c == NULL)
         return 0;
+
+    OPENSSL_init();
 
     r = OBJ_NAME_add(OBJ_nid2sn(c->nid), OBJ_NAME_TYPE_CIPHER_METH,
                      (const char *)c);
@@ -83,6 +85,7 @@ int EVP_add_digest(const EVP_MD *md)
 {
     int r;
     const char *name;
+    OPENSSL_init();
 
     name = OBJ_nid2sn(md->type);
     r = OBJ_NAME_add(name, OBJ_NAME_TYPE_MD_METH, (const char *)md);

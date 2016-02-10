@@ -1,3 +1,4 @@
+/* crypto/rc4/rc4_skey.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -55,16 +56,25 @@
  * [including the GNU Public Licence.]
  */
 
-#include <openssl/rc4.h>
+#include "rc4.h"
 #include "rc4_locl.h"
 #include <openssl/opensslv.h>
 
+const char RC4_version[] = "RC4" OPENSSL_VERSION_PTEXT;
+
 const char *RC4_options(void)
 {
+#ifdef RC4_INDEX
     if (sizeof(RC4_INT) == 1)
-        return ("rc4(char)");
+        return ("rc4(idx,char)");
     else
-        return ("rc4(int)");
+        return ("rc4(idx,int)");
+#else
+    if (sizeof(RC4_INT) == 1)
+        return ("rc4(ptr,char)");
+    else
+        return ("rc4(ptr,int)");
+#endif
 }
 
 /*-
@@ -76,7 +86,7 @@ const char *RC4_options(void)
  * Date: Wed, 14 Sep 1994 06:35:31 GMT
  */
 
-void RC4_set_key(RC4_KEY *key, int len, const unsigned char *data)
+void private_RC4_set_key(RC4_KEY *key, int len, const unsigned char *data)
 {
     register RC4_INT tmp;
     register int id1, id2;

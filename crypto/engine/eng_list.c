@@ -1,3 +1,4 @@
+/* crypto/engine/eng_list.c */
 /*
  * Written by Geoff Thorpe (geoff@geoffthorpe.net) for the OpenSSL project
  * 2000.
@@ -141,9 +142,9 @@ static int engine_list_add(ENGINE *e)
      * Having the engine in the list assumes a structural reference.
      */
     e->struct_ref++;
-    engine_ref_debug(e, 0, 1);
-    /* However it came to be, e is the last item in the list. */
-    engine_list_tail = e;
+    engine_ref_debug(e, 0, 1)
+        /* However it came to be, e is the last item in the list. */
+        engine_list_tail = e;
     e->next = NULL;
     return 1;
 }
@@ -188,7 +189,7 @@ ENGINE *ENGINE_get_first(void)
     ret = engine_list_head;
     if (ret) {
         ret->struct_ref++;
-        engine_ref_debug(ret, 0, 1);
+        engine_ref_debug(ret, 0, 1)
     }
     CRYPTO_w_unlock(CRYPTO_LOCK_ENGINE);
     return ret;
@@ -202,7 +203,7 @@ ENGINE *ENGINE_get_last(void)
     ret = engine_list_tail;
     if (ret) {
         ret->struct_ref++;
-        engine_ref_debug(ret, 0, 1);
+        engine_ref_debug(ret, 0, 1)
     }
     CRYPTO_w_unlock(CRYPTO_LOCK_ENGINE);
     return ret;
@@ -219,9 +220,9 @@ ENGINE *ENGINE_get_next(ENGINE *e)
     CRYPTO_w_lock(CRYPTO_LOCK_ENGINE);
     ret = e->next;
     if (ret) {
-        /* Return a valid structural reference to the next ENGINE */
+        /* Return a valid structural refernce to the next ENGINE */
         ret->struct_ref++;
-        engine_ref_debug(ret, 0, 1);
+        engine_ref_debug(ret, 0, 1)
     }
     CRYPTO_w_unlock(CRYPTO_LOCK_ENGINE);
     /* Release the structural reference to the previous ENGINE */
@@ -241,7 +242,7 @@ ENGINE *ENGINE_get_prev(ENGINE *e)
     if (ret) {
         /* Return a valid structural reference to the next ENGINE */
         ret->struct_ref++;
-        engine_ref_debug(ret, 0, 1);
+        engine_ref_debug(ret, 0, 1)
     }
     CRYPTO_w_unlock(CRYPTO_LOCK_ENGINE);
     /* Release the structural reference to the previous ENGINE */
@@ -259,7 +260,6 @@ int ENGINE_add(ENGINE *e)
     }
     if ((e->id == NULL) || (e->name == NULL)) {
         ENGINEerr(ENGINE_F_ENGINE_ADD, ENGINE_R_ID_OR_NAME_MISSING);
-        return 0;
     }
     CRYPTO_w_lock(CRYPTO_LOCK_ENGINE);
     if (!engine_list_add(e)) {
@@ -300,8 +300,11 @@ static void engine_cpy(ENGINE *dest, const ENGINE *src)
 #ifndef OPENSSL_NO_DH
     dest->dh_meth = src->dh_meth;
 #endif
-#ifndef OPENSSL_NO_EC
-    dest->ec_meth = src->ec_meth;
+#ifndef OPENSSL_NO_ECDH
+    dest->ecdh_meth = src->ecdh_meth;
+#endif
+#ifndef OPENSSL_NO_ECDSA
+    dest->ecdsa_meth = src->ecdsa_meth;
 #endif
     dest->rand_meth = src->rand_meth;
     dest->store_meth = src->store_meth;
@@ -330,7 +333,7 @@ ENGINE *ENGINE_by_id(const char *id)
     iterator = engine_list_head;
     while (iterator && (strcmp(id, iterator->id) != 0))
         iterator = iterator->next;
-    if (iterator != NULL) {
+    if (iterator) {
         /*
          * We need to return a structural reference. If this is an ENGINE
          * type that returns copies, make a duplicate - otherwise increment
@@ -338,7 +341,7 @@ ENGINE *ENGINE_by_id(const char *id)
          */
         if (iterator->flags & ENGINE_FLAGS_BY_ID_COPY) {
             ENGINE *cp = ENGINE_new();
-            if (cp == NULL)
+            if (!cp)
                 iterator = NULL;
             else {
                 engine_cpy(cp, iterator);
@@ -346,14 +349,22 @@ ENGINE *ENGINE_by_id(const char *id)
             }
         } else {
             iterator->struct_ref++;
-            engine_ref_debug(iterator, 0, 1);
+            engine_ref_debug(iterator, 0, 1)
         }
     }
     CRYPTO_w_unlock(CRYPTO_LOCK_ENGINE);
-    if (iterator != NULL)
+#if 0
+    if (iterator == NULL) {
+        ENGINEerr(ENGINE_F_ENGINE_BY_ID, ENGINE_R_NO_SUCH_ENGINE);
+        ERR_add_error_data(2, "id=", id);
+    }
+    return iterator;
+#else
+    /* EEK! Experimental code starts */
+    if (iterator)
         return iterator;
     /*
-     * Prevent infinite recursion if we're looking for the dynamic engine.
+     * Prevent infinite recusrion if we're looking for the dynamic engine.
      */
     if (strcmp(id, "dynamic")) {
 # ifdef OPENSSL_SYS_VMS
@@ -379,6 +390,7 @@ ENGINE *ENGINE_by_id(const char *id)
     ERR_add_error_data(2, "id=", id);
     return NULL;
     /* EEK! Experimental code ends */
+#endif
 }
 
 int ENGINE_up_ref(ENGINE *e)

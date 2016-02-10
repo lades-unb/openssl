@@ -1,3 +1,4 @@
+/* v3_conf.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 1999.
@@ -59,11 +60,11 @@
 
 #include <stdio.h>
 #include <ctype.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/conf.h>
 #include <openssl/x509.h>
-#include "internal/x509_int.h"
 #include <openssl/x509v3.h>
+#include <openssl/lhash.h>
 
 static int v3_check_critical(char **value);
 static int v3_check_generic(char **value);
@@ -121,12 +122,11 @@ static X509_EXTENSION *do_ext_nconf(CONF *conf, X509V3_CTX *ctx, int ext_nid,
     X509_EXTENSION *ext;
     STACK_OF(CONF_VALUE) *nval;
     void *ext_struc;
-
     if (ext_nid == NID_undef) {
         X509V3err(X509V3_F_DO_EXT_NCONF, X509V3_R_UNKNOWN_EXTENSION_NAME);
         return NULL;
     }
-    if ((method = X509V3_EXT_get_nid(ext_nid)) == NULL) {
+    if (!(method = X509V3_EXT_get_nid(ext_nid))) {
         X509V3err(X509V3_F_DO_EXT_NCONF, X509V3_R_UNKNOWN_EXTENSION);
         return NULL;
     }
@@ -149,14 +149,14 @@ static X509_EXTENSION *do_ext_nconf(CONF *conf, X509V3_CTX *ctx, int ext_nid,
         if (!ext_struc)
             return NULL;
     } else if (method->s2i) {
-        if ((ext_struc = method->s2i(method, ctx, value)) == NULL)
+        if (!(ext_struc = method->s2i(method, ctx, value)))
             return NULL;
     } else if (method->r2i) {
         if (!ctx->db || !ctx->db_meth) {
             X509V3err(X509V3_F_DO_EXT_NCONF, X509V3_R_NO_CONFIG_DATABASE);
             return NULL;
         }
-        if ((ext_struc = method->r2i(method, ctx, value)) == NULL)
+        if (!(ext_struc = method->r2i(method, ctx, value)))
             return NULL;
     } else {
         X509V3err(X509V3_F_DO_EXT_NCONF,
@@ -177,9 +177,9 @@ static X509_EXTENSION *do_ext_nconf(CONF *conf, X509V3_CTX *ctx, int ext_nid,
 static X509_EXTENSION *do_ext_i2d(const X509V3_EXT_METHOD *method,
                                   int ext_nid, int crit, void *ext_struc)
 {
-    unsigned char *ext_der = NULL;
+    unsigned char *ext_der;
     int ext_len;
-    ASN1_OCTET_STRING *ext_oct = NULL;
+    ASN1_OCTET_STRING *ext_oct;
     X509_EXTENSION *ext;
     /* Convert internal representation to DER */
     if (method->it) {
@@ -190,30 +190,26 @@ static X509_EXTENSION *do_ext_i2d(const X509V3_EXT_METHOD *method,
             goto merr;
     } else {
         unsigned char *p;
-
         ext_len = method->i2d(ext_struc, NULL);
-        if ((ext_der = OPENSSL_malloc(ext_len)) == NULL)
+        if (!(ext_der = OPENSSL_malloc(ext_len)))
             goto merr;
         p = ext_der;
         method->i2d(ext_struc, &p);
     }
-    if ((ext_oct = ASN1_OCTET_STRING_new()) == NULL)
+    if (!(ext_oct = M_ASN1_OCTET_STRING_new()))
         goto merr;
     ext_oct->data = ext_der;
-    ext_der = NULL;
     ext_oct->length = ext_len;
 
     ext = X509_EXTENSION_create_by_NID(NULL, ext_nid, crit, ext_oct);
     if (!ext)
         goto merr;
-    ASN1_OCTET_STRING_free(ext_oct);
+    M_ASN1_OCTET_STRING_free(ext_oct);
 
     return ext;
 
  merr:
     X509V3err(X509V3_F_DO_EXT_I2D, ERR_R_MALLOC_FAILURE);
-    OPENSSL_free(ext_der);
-    ASN1_OCTET_STRING_free(ext_oct);
     return NULL;
 
 }
@@ -223,8 +219,7 @@ static X509_EXTENSION *do_ext_i2d(const X509V3_EXT_METHOD *method,
 X509_EXTENSION *X509V3_EXT_i2d(int ext_nid, int crit, void *ext_struc)
 {
     const X509V3_EXT_METHOD *method;
-
-    if ((method = X509V3_EXT_get_nid(ext_nid)) == NULL) {
+    if (!(method = X509V3_EXT_get_nid(ext_nid))) {
         X509V3err(X509V3_F_X509V3_EXT_I2D, X509V3_R_UNKNOWN_EXTENSION);
         return NULL;
     }
@@ -249,10 +244,10 @@ static int v3_check_generic(char **value)
 {
     int gen_type = 0;
     char *p = *value;
-    if ((strlen(p) >= 4) && strncmp(p, "DER:", 4) == 0) {
+    if ((strlen(p) >= 4) && !strncmp(p, "DER:", 4)) {
         p += 4;
         gen_type = 1;
-    } else if ((strlen(p) >= 5) && strncmp(p, "ASN1:", 5) == 0) {
+    } else if ((strlen(p) >= 5) && !strncmp(p, "ASN1:", 5)) {
         p += 5;
         gen_type = 2;
     } else
@@ -270,12 +265,11 @@ static X509_EXTENSION *v3_generic_extension(const char *ext, char *value,
                                             X509V3_CTX *ctx)
 {
     unsigned char *ext_der = NULL;
-    long ext_len = 0;
+    long ext_len;
     ASN1_OBJECT *obj = NULL;
     ASN1_OCTET_STRING *oct = NULL;
     X509_EXTENSION *extension = NULL;
-
-    if ((obj = OBJ_txt2obj(ext, 0)) == NULL) {
+    if (!(obj = OBJ_txt2obj(ext, 0))) {
         X509V3err(X509V3_F_V3_GENERIC_EXTENSION,
                   X509V3_R_EXTENSION_NAME_ERROR);
         ERR_add_error_data(2, "name=", ext);
@@ -294,7 +288,7 @@ static X509_EXTENSION *v3_generic_extension(const char *ext, char *value,
         goto err;
     }
 
-    if ((oct = ASN1_OCTET_STRING_new()) == NULL) {
+    if (!(oct = M_ASN1_OCTET_STRING_new())) {
         X509V3err(X509V3_F_V3_GENERIC_EXTENSION, ERR_R_MALLOC_FAILURE);
         goto err;
     }
@@ -307,8 +301,9 @@ static X509_EXTENSION *v3_generic_extension(const char *ext, char *value,
 
  err:
     ASN1_OBJECT_free(obj);
-    ASN1_OCTET_STRING_free(oct);
-    OPENSSL_free(ext_der);
+    M_ASN1_OCTET_STRING_free(oct);
+    if (ext_der)
+        OPENSSL_free(ext_der);
     return extension;
 
 }
@@ -326,18 +321,6 @@ static unsigned char *generic_asn1(char *value, X509V3_CTX *ctx,
     return ext_der;
 }
 
-static void delete_ext(STACK_OF(X509_EXTENSION) *sk, X509_EXTENSION *dext)
-{
-    int idx;
-    ASN1_OBJECT *obj;
-    obj = X509_EXTENSION_get_object(dext);
-    while ((idx = X509v3_get_ext_by_OBJ(sk, obj, -1)) >= 0) {
-        X509_EXTENSION *tmpext = X509v3_get_ext(sk, idx);
-        X509v3_delete_ext(sk, idx);
-        X509_EXTENSION_free(tmpext);
-    }
-}
-
 /*
  * This is the main function: add a bunch of extensions based on a config
  * file section to an extension STACK.
@@ -350,15 +333,12 @@ int X509V3_EXT_add_nconf_sk(CONF *conf, X509V3_CTX *ctx, char *section,
     STACK_OF(CONF_VALUE) *nval;
     CONF_VALUE *val;
     int i;
-
-    if ((nval = NCONF_get_section(conf, section)) == NULL)
+    if (!(nval = NCONF_get_section(conf, section)))
         return 0;
     for (i = 0; i < sk_CONF_VALUE_num(nval); i++) {
         val = sk_CONF_VALUE_value(nval, i);
-        if ((ext = X509V3_EXT_nconf(conf, ctx, val->name, val->value)) == NULL)
+        if (!(ext = X509V3_EXT_nconf(conf, ctx, val->name, val->value)))
             return 0;
-        if (ctx->flags == X509V3_CTX_REPLACE)
-            delete_ext(*sk, ext);
         if (sk)
             X509v3_add_ext(sk, ext, -1);
         X509_EXTENSION_free(ext);
@@ -375,7 +355,7 @@ int X509V3_EXT_add_nconf(CONF *conf, X509V3_CTX *ctx, char *section,
 {
     STACK_OF(X509_EXTENSION) **sk = NULL;
     if (cert)
-        sk = &cert->cert_info.extensions;
+        sk = &cert->cert_info->extensions;
     return X509V3_EXT_add_nconf_sk(conf, ctx, section, sk);
 }
 
@@ -386,7 +366,7 @@ int X509V3_EXT_CRL_add_nconf(CONF *conf, X509V3_CTX *ctx, char *section,
 {
     STACK_OF(X509_EXTENSION) **sk = NULL;
     if (crl)
-        sk = &crl->crl.extensions;
+        sk = &crl->crl->extensions;
     return X509V3_EXT_add_nconf_sk(conf, ctx, section, sk);
 }
 

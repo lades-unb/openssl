@@ -1,3 +1,4 @@
+/* crypto/asn1/a_digest.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -58,7 +59,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 
 #ifndef NO_SYS_TYPES_H
 # include <sys/types.h>
@@ -78,7 +79,7 @@ int ASN1_digest(i2d_of_void *i2d, const EVP_MD *type, char *data,
     unsigned char *str, *p;
 
     i = i2d(data, NULL);
-    if ((str = OPENSSL_malloc(i)) == NULL) {
+    if ((str = (unsigned char *)OPENSSL_malloc(i)) == NULL) {
         ASN1err(ASN1_F_ASN1_DIGEST, ERR_R_MALLOC_FAILURE);
         return (0);
     }

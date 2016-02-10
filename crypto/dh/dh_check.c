@@ -1,3 +1,4 @@
+/* crypto/dh/dh_check.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,7 +57,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/bn.h>
 #include <openssl/dh.h>
 
@@ -115,7 +116,15 @@ int DH_check(const DH *dh, int *ret)
         l = BN_mod_word(dh->p, 24);
         if (l != 11)
             *ret |= DH_NOT_SUITABLE_GENERATOR;
-    } else if (BN_is_word(dh->g, DH_GENERATOR_5)) {
+    }
+#if 0
+    else if (BN_is_word(dh->g, DH_GENERATOR_3)) {
+        l = BN_mod_word(dh->p, 12);
+        if (l != 5)
+            *ret |= DH_NOT_SUITABLE_GENERATOR;
+    }
+#endif
+    else if (BN_is_word(dh->g, DH_GENERATOR_5)) {
         l = BN_mod_word(dh->p, 10);
         if ((l != 3) && (l != 7))
             *ret |= DH_NOT_SUITABLE_GENERATOR;
@@ -142,37 +151,23 @@ int DH_check(const DH *dh, int *ret)
 int DH_check_pub_key(const DH *dh, const BIGNUM *pub_key, int *ret)
 {
     int ok = 0;
-    BIGNUM *tmp = NULL;
-    BN_CTX *ctx = NULL;
+    BIGNUM *q = NULL;
 
     *ret = 0;
-    ctx = BN_CTX_new();
-    if (ctx == NULL)
+    q = BN_new();
+    if (q == NULL)
         goto err;
-    BN_CTX_start(ctx);
-    tmp = BN_CTX_get(ctx);
-    if (tmp == NULL || !BN_set_word(tmp, 1))
-        goto err;
-    if (BN_cmp(pub_key, tmp) <= 0)
+    BN_set_word(q, 1);
+    if (BN_cmp(pub_key, q) <= 0)
         *ret |= DH_CHECK_PUBKEY_TOO_SMALL;
-    if (BN_copy(tmp, dh->p) == NULL || !BN_sub_word(tmp, 1))
-        goto err;
-    if (BN_cmp(pub_key, tmp) >= 0)
+    BN_copy(q, dh->p);
+    BN_sub_word(q, 1);
+    if (BN_cmp(pub_key, q) >= 0)
         *ret |= DH_CHECK_PUBKEY_TOO_LARGE;
-
-    if (dh->q != NULL) {
-        /* Check pub_key^q == 1 mod p */
-        if (!BN_mod_exp(tmp, pub_key, dh->q, dh->p, ctx))
-            goto err;
-        if (!BN_is_one(tmp))
-            *ret |= DH_CHECK_PUBKEY_INVALID;
-    }
 
     ok = 1;
  err:
-    if (ctx != NULL) {
-        BN_CTX_end(ctx);
-        BN_CTX_free(ctx);
-    }
+    if (q != NULL)
+        BN_free(q);
     return (ok);
 }

@@ -1,3 +1,4 @@
+/* crypto/bn/bn_kron.c */
 /* ====================================================================
  * Copyright (c) 1998-2000 The OpenSSL Project.  All rights reserved.
  *
@@ -52,7 +53,7 @@
  *
  */
 
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include "bn_lcl.h"
 
 /* least significant word */
@@ -91,7 +92,7 @@ int BN_kronecker(const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx)
         goto end;
 
     /*
-     * Kronecker symbol, implemented according to Henri Cohen,
+     * Kronecker symbol, imlemented according to Henri Cohen,
      * "A Course in Computational Algebraic Number Theory"
      * (algorithm 1.4.10).
      */

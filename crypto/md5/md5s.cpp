@@ -43,9 +43,9 @@ void main(int argc,char *argv[])
 	unsigned char buffer[64*256];
 	MD5_CTX ctx;
 	unsigned long s1,s2,e1,e2;
-	unsigned char k[16];
-	unsigned long data[2];
-	unsigned char iv[8];
+	//unsigned char k[16];
+	//unsigned long data[2];
+	//unsigned char iv[8];
 	int i,num=0,numm;
 	int j=0;
 

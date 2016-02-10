@@ -1,3 +1,4 @@
+/* crypto/bio/bf_buff.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -57,7 +58,7 @@
 
 #include <stdio.h>
 #include <errno.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 
@@ -103,10 +104,10 @@ static int linebuffer_new(BIO *bi)
 {
     BIO_LINEBUFFER_CTX *ctx;
 
-    ctx = OPENSSL_malloc(sizeof(*ctx));
+    ctx = (BIO_LINEBUFFER_CTX *)OPENSSL_malloc(sizeof(BIO_LINEBUFFER_CTX));
     if (ctx == NULL)
         return (0);
-    ctx->obuf = OPENSSL_malloc(DEFAULT_LINEBUFFER_SIZE);
+    ctx->obuf = (char *)OPENSSL_malloc(DEFAULT_LINEBUFFER_SIZE);
     if (ctx->obuf == NULL) {
         OPENSSL_free(ctx);
         return (0);
@@ -127,7 +128,8 @@ static int linebuffer_free(BIO *a)
     if (a == NULL)
         return (0);
     b = (BIO_LINEBUFFER_CTX *)a->ptr;
-    OPENSSL_free(b->obuf);
+    if (b->obuf != NULL)
+        OPENSSL_free(b->obuf);
     OPENSSL_free(a->ptr);
     a->ptr = NULL;
     a->init = 0;
@@ -196,16 +198,25 @@ static int linebuffer_write(BIO *b, const char *in, int inl)
                     num += i;
                 }
             }
+#if 0
+            BIO_write(b->next_bio, "<*<", 3);
+#endif
             i = BIO_write(b->next_bio, ctx->obuf, ctx->obuf_len);
             if (i <= 0) {
                 ctx->obuf_len = orig_olen;
                 BIO_copy_next_retry(b);
 
+#if 0
+                BIO_write(b->next_bio, ">*>", 3);
+#endif
                 if (i < 0)
                     return ((num > 0) ? num : i);
                 if (i == 0)
                     return (num);
             }
+#if 0
+            BIO_write(b->next_bio, ">*>", 3);
+#endif
             if (i < ctx->obuf_len)
                 memmove(ctx->obuf, ctx->obuf + i, ctx->obuf_len - i);
             ctx->obuf_len -= i;
@@ -216,14 +227,23 @@ static int linebuffer_write(BIO *b, const char *in, int inl)
          * if a NL was found and there is anything to write.
          */
         if ((foundnl || p - in > ctx->obuf_size) && p - in > 0) {
+#if 0
+            BIO_write(b->next_bio, "<*<", 3);
+#endif
             i = BIO_write(b->next_bio, in, p - in);
             if (i <= 0) {
                 BIO_copy_next_retry(b);
+#if 0
+                BIO_write(b->next_bio, ">*>", 3);
+#endif
                 if (i < 0)
                     return ((num > 0) ? num : i);
                 if (i == 0)
                     return (num);
             }
+#if 0
+            BIO_write(b->next_bio, ">*>", 3);
+#endif
             num += i;
             in += i;
             inl -= i;
@@ -276,7 +296,7 @@ static long linebuffer_ctrl(BIO *b, int cmd, long num, void *ptr)
         obs = (int)num;
         p = ctx->obuf;
         if ((obs > DEFAULT_LINEBUFFER_SIZE) && (obs != ctx->obuf_size)) {
-            p = OPENSSL_malloc((int)num);
+            p = (char *)OPENSSL_malloc((int)num);
             if (p == NULL)
                 goto malloc_error;
         }
@@ -310,6 +330,9 @@ static long linebuffer_ctrl(BIO *b, int cmd, long num, void *ptr)
             BIO_clear_retry_flags(b);
             if (ctx->obuf_len > 0) {
                 r = BIO_write(b->next_bio, ctx->obuf, ctx->obuf_len);
+#if 0
+                fprintf(stderr, "FLUSH %3d -> %3d\n", ctx->obuf_len, r);
+#endif
                 BIO_copy_next_retry(b);
                 if (r <= 0)
                     return ((long)r);

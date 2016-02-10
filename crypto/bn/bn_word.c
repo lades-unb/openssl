@@ -1,3 +1,4 @@
+/* crypto/bn/bn_word.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -55,7 +56,8 @@
  * [including the GNU Public Licence.]
  */
 
-#include "internal/cryptlib.h"
+#include <stdio.h>
+#include "cryptlib.h"
 #include "bn_lcl.h"
 
 BN_ULONG BN_mod_word(const BIGNUM *a, BN_ULONG w)

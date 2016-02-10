@@ -1,3 +1,4 @@
+/* crypto/cms/cms_io.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
@@ -58,15 +59,17 @@
 #include <openssl/cms.h>
 #include "cms_lcl.h"
 
+#include <openssl/asn1t.h>
+
 int CMS_stream(unsigned char ***boundary, CMS_ContentInfo *cms)
 {
     ASN1_OCTET_STRING **pos;
     pos = CMS_get0_content(cms);
-    if (pos == NULL)
+    if (!pos)
         return 0;
-    if (*pos == NULL)
+    if (!*pos)
         *pos = ASN1_OCTET_STRING_new();
-    if (*pos != NULL) {
+    if (*pos) {
         (*pos)->flags |= ASN1_STRING_FLAG_NDEF;
         (*pos)->flags &= ~ASN1_STRING_FLAG_CONT;
         *boundary = &(*pos)->data;
@@ -94,7 +97,7 @@ BIO *BIO_new_CMS(BIO *out, CMS_ContentInfo *cms)
                         ASN1_ITEM_rptr(CMS_ContentInfo));
 }
 
-/* CMS wrappers round generalised stream and MIME routines */
+/* CMS wrappers around generalised stream and MIME routines */
 
 int i2d_CMS_bio_stream(BIO *out, CMS_ContentInfo *cms, BIO *in, int flags)
 {
@@ -118,6 +121,8 @@ int SMIME_write_CMS(BIO *bio, CMS_ContentInfo *cms, BIO *data, int flags)
         mdalgs = cms->d.signedData->digestAlgorithms;
     else
         mdalgs = NULL;
+
+	const struct ASN1_ITEM_st *p_asn1Item = ASN1_ITEM_rptr(CMS_ContentInfo);
 
     return SMIME_write_ASN1(bio, (ASN1_VALUE *)cms, data, flags,
                             ctype_nid, econt_nid, mdalgs,

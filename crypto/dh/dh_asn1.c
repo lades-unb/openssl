@@ -1,3 +1,4 @@
+/* dh_asn1.c */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL project
  * 2000.
@@ -57,7 +58,7 @@
  */
 
 #include <stdio.h>
-#include "internal/cryptlib.h"
+#include "cryptlib.h"
 #include <openssl/bn.h>
 #include <openssl/dh.h>
 #include <openssl/objects.h>
@@ -69,7 +70,7 @@ static int dh_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it,
 {
     if (operation == ASN1_OP_NEW_PRE) {
         *pval = (ASN1_VALUE *)DH_new();
-        if (*pval != NULL)
+        if (*pval)
             return 2;
         return 0;
     } else if (operation == ASN1_OP_FREE_PRE) {
@@ -84,7 +85,7 @@ ASN1_SEQUENCE_cb(DHparams, dh_cb) = {
         ASN1_SIMPLE(DH, p, BIGNUM),
         ASN1_SIMPLE(DH, g, BIGNUM),
         ASN1_OPT(DH, length, ZLONG),
-} static_ASN1_SEQUENCE_END_cb(DH, DHparams)
+} ASN1_SEQUENCE_END_cb(DH, DHparams)
 
 IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(DH, DHparams, DHparams)
 
@@ -109,7 +110,7 @@ typedef struct {
 ASN1_SEQUENCE(DHvparams) = {
         ASN1_SIMPLE(int_dhvparams, seed, ASN1_BIT_STRING),
         ASN1_SIMPLE(int_dhvparams, counter, BIGNUM)
-} static_ASN1_SEQUENCE_END_name(int_dhvparams, DHvparams)
+} ASN1_SEQUENCE_END_name(int_dhvparams, DHvparams)
 
 ASN1_SEQUENCE(DHxparams) = {
         ASN1_SIMPLE(int_dhx942_dh, p, BIGNUM),
@@ -117,7 +118,7 @@ ASN1_SEQUENCE(DHxparams) = {
         ASN1_SIMPLE(int_dhx942_dh, q, BIGNUM),
         ASN1_OPT(int_dhx942_dh, j, BIGNUM),
         ASN1_OPT(int_dhx942_dh, vparams, DHvparams),
-} static_ASN1_SEQUENCE_END_name(int_dhx942_dh, DHxparams)
+} ASN1_SEQUENCE_END_name(int_dhx942_dh, DHxparams)
 
 int_dhx942_dh *d2i_int_dhx(int_dhx942_dh **a,
                            const unsigned char **pp, long length);
@@ -125,23 +126,24 @@ int i2d_int_dhx(const int_dhx942_dh *a, unsigned char **pp);
 
 IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(int_dhx942_dh, DHxparams, int_dhx)
 
-/* Application public function: read in X9.42 DH parameters into DH structure */
+/* Application leve function: read in X9.42 DH parameters into DH structure */
 
 DH *d2i_DHxparams(DH **a, const unsigned char **pp, long length)
 {
     int_dhx942_dh *dhx = NULL;
     DH *dh = NULL;
     dh = DH_new();
-    if (dh == NULL)
+    if (!dh)
         return NULL;
     dhx = d2i_int_dhx(NULL, pp, length);
-    if (dhx == NULL) {
+    if (!dhx) {
         DH_free(dh);
         return NULL;
     }
 
     if (a) {
-        DH_free(*a);
+        if (*a)
+            DH_free(*a);
         *a = dh;
     }
 
