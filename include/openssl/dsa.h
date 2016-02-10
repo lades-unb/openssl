@@ -222,14 +222,14 @@ DSA *d2i_DSAPrivateKey(DSA **a, const unsigned char **pp, long length);
 DSA *d2i_DSAparams(DSA **a, const unsigned char **pp, long length);
 
 /* Deprecated version */
-DEPRECATEDIN_0_9_8(DSA *DSA_generate_parameters(int bits,
-                                                unsigned char *seed,
-                                                int seed_len,
-                                                int *counter_ret,
-                                                unsigned long *h_ret, void
-                                                 (*callback) (int, int,
-                                                              void *),
-                                                void *cb_arg));
+//DEPRECATEDIN_0_9_8(DSA *DSA_generate_parameters(int bits,
+//                                                unsigned char *seed,
+//                                                int seed_len,
+//                                                int *counter_ret,
+//                                                unsigned long *h_ret, void
+//                                                 (*callback) (int, int,
+//                                                              void *),
+//                                                void *cb_arg));
 
 /* New version */
 int DSA_generate_parameters_ex(DSA *dsa, int bits,
