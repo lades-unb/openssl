@@ -10,6 +10,7 @@
 #include <openssl/x509.h>
 #include <openssl/cms.h>
 #include <openssl/asn1.h>
+#include "bio_lcl.h"
 #include "pades.h"
 
 
@@ -138,3 +139,111 @@ int Pades_ASN1_Data_is_B64(BUF_MEM *buf)   {
 	else     return(B64_NON_MATCH);
 
 }
+
+static BIO * bio_err = NULL;
+
+
+/***
+*   This function takes as input (the cp parameter) a distinguished name in 
+*   ASCII format such as: 
+*             "/type0=value0/type1=value1/type2=..."
+*   and returns an openssl object of type X509_NAME.
+*/
+
+X509_NAME *Pades_parse_name(const char *cp, long chtype, int canmulti)
+{
+	int nextismulti = 0;
+	char *work;
+	X509_NAME *n;
+	char *function_name = "Pades_parse_name()";
+
+	bio_err = BIO_new_fp(stderr, BIO_NOCLOSE | BIO_FP_TEXT);
+
+	if (*cp++ != '/')
+		return NULL;
+
+	n = X509_NAME_new();
+	if (n == NULL)
+		return NULL;
+	work = OPENSSL_strdup(cp);
+	if (work == NULL)
+		goto err;
+
+	while (*cp) {
+		char *bp = work;
+		char *typestr = bp;
+		unsigned char *valstr;
+		int nid;
+		int ismulti = nextismulti;
+		nextismulti = 0;
+
+		// Collect the type 
+		while (*cp && *cp != '=')
+			*bp++ = *cp++;
+		if (*cp == '\0') {
+			BIO_printf(bio_err,
+				"%s: Hit end of string before finding the equals.\n",
+				function_name);
+			goto err;
+		}
+		*bp++ = '\0';
+		++cp;
+
+		// Collect the value.
+		valstr = (unsigned char *)bp;
+		for (; *cp && *cp != '/'; *bp++ = *cp++) {
+			if (canmulti && *cp == '+') {
+				nextismulti = 1;
+				break;
+			}
+			if (*cp == '\\' && *++cp == '\0') {
+				BIO_printf(bio_err,
+					"%s: escape character at end of string\n",
+					function_name);
+				goto err;
+			}
+		}
+		*bp++ = '\0';
+
+		// If not at EOS (must be + or /), move forward.
+		if (*cp)
+			++cp;
+
+		// Parse 
+		nid = OBJ_txt2nid(typestr);
+		if (nid == NID_undef) {
+			BIO_printf(bio_err, "%s: Skipping unknown attribute \"%s\"\n",
+				function_name, typestr);
+			continue;
+		}
+		if (!X509_NAME_add_entry_by_NID(n, nid, chtype,
+			valstr, strlen((char *)valstr),
+			-1, ismulti ? -1 : 0))
+			goto err;
+	}
+
+	OPENSSL_free(work);
+	return n;
+
+err:
+	X509_NAME_free(n);
+	OPENSSL_free(work);
+	return NULL;
+}
+
+
+/***
+*	This function takes as input a distinguished name in ASCII format such as:
+*       "/C=BR/ST=SC/L=Brasilia/O=UNB/OU=LADES/CN=Usuario 1"
+*   and returns the corresponding ASN1 encoded DN in outbuf.
+*/
+
+void Pades_get_ASN1_DN(const char *name, unsigned char **outbuf)
+{
+	X509_NAME  *x509Name = NULL;
+
+	x509Name = Pades_parse_name(name, MBSTRING_ASC, 1);
+	i2d_X509_NAME(x509Name, outbuf);
+}
+
+
