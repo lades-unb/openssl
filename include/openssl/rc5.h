@@ -1,4 +1,4 @@
-/* crypto/sha/sha.c */
+/* crypto/rc5/rc5.h */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,63 +56,61 @@
  * [including the GNU Public Licence.]
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <openssl/sha.h>
+#ifndef HEADER_RC5_H
+# define HEADER_RC5_H
 
-#define BUFSIZE 1024*16
+# include <openssl/opensslconf.h>/* OPENSSL_NO_RC5 */
 
-void do_fp(FILE *f);
-void pt(unsigned char *md);
-int read(int, void *, unsigned int);
-int main(int argc, char **argv)
-{
-    int i, err = 0;
-    FILE *IN;
+#ifdef  __cplusplus
+extern "C" {
+#endif
 
-    if (argc == 1) {
-        do_fp(stdin);
-    } else {
-        for (i = 1; i < argc; i++) {
-            IN = fopen(argv[i], "r");
-            if (IN == NULL) {
-                perror(argv[i]);
-                err++;
-                continue;
-            }
-            printf("SHA(%s)= ", argv[i]);
-            do_fp(IN);
-            fclose(IN);
-        }
-    }
-    exit(err);
+#undef OPENSSL_NO_RC5
+# ifdef OPENSSL_NO_RC5
+#  error RC5 is disabled.
+# endif
+
+# define RC5_ENCRYPT     1
+# define RC5_DECRYPT     0
+
+/* 32 bit.  For Alpha, things may get weird */
+# define RC5_32_INT unsigned long
+
+# define RC5_32_BLOCK            8
+# define RC5_32_KEY_LENGTH       16/* This is a default, max is 255 */
+
+/*
+ * This are the only values supported.  Tweak the code if you want more The
+ * most supported modes will be RC5-32/12/16 RC5-32/16/8
+ */
+# define RC5_8_ROUNDS    8
+# define RC5_12_ROUNDS   12
+# define RC5_16_ROUNDS   16
+
+typedef struct rc5_key_st {
+    /* Number of rounds */
+    int rounds;
+    RC5_32_INT data[2 * (RC5_16_ROUNDS + 1)];
+} RC5_32_KEY;
+
+void RC5_32_set_key(RC5_32_KEY *key, int len, const unsigned char *data,
+                    int rounds);
+void RC5_32_ecb_encrypt(const unsigned char *in, unsigned char *out,
+                        RC5_32_KEY *key, int enc);
+void RC5_32_encrypt(unsigned long *data, RC5_32_KEY *key);
+void RC5_32_decrypt(unsigned long *data, RC5_32_KEY *key);
+void RC5_32_cbc_encrypt(const unsigned char *in, unsigned char *out,
+                        long length, RC5_32_KEY *ks, unsigned char *iv,
+                        int enc);
+void RC5_32_cfb64_encrypt(const unsigned char *in, unsigned char *out,
+                          long length, RC5_32_KEY *schedule,
+                          unsigned char *ivec, int *num, int enc);
+void RC5_32_ofb64_encrypt(const unsigned char *in, unsigned char *out,
+                          long length, RC5_32_KEY *schedule,
+                          unsigned char *ivec, int *num);
+
+#ifdef  __cplusplus
 }
+#endif
 
-void do_fp(FILE *f)
-{
-    SHA_CTX c;
-    unsigned char md[SHA_DIGEST_LENGTH];
-    int fd;
-    int i;
-    unsigned char buf[BUFSIZE];
-
-    fd = _fileno(f);
-    SHA_Init(&c);
-    for (;;) {
-        i = read(fd, buf, BUFSIZE);
-        if (i <= 0)
-            break;
-        SHA_Update(&c, buf, (unsigned long)i);
-    }
-    SHA_Final(&(md[0]), &c);
-    pt(md);
-}
-
-void pt(unsigned char *md)
-{
-    int i;
-
-    for (i = 0; i < SHA_DIGEST_LENGTH; i++)
-        printf("%02x", md[i]);
-    printf("\n");
-}
+#endif

@@ -99,7 +99,7 @@ void do_fp(FILE *f)
     int i;
     static unsigned char buf[BUFSIZE];
 
-    fd = fileno(f);
+    fd = _fileno(f);
     RIPEMD160_Init(&c);
     for (;;) {
         i = read(fd, buf, BUFSIZE);

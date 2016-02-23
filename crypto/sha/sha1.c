@@ -99,7 +99,7 @@ void do_fp(FILE *f)
     int i;
     unsigned char buf[BUFSIZE];
 
-    fd = fileno(f);
+    fd = _fileno(f);
     SHA1_Init(&c);
     for (;;) {
         i = read(fd, buf, BUFSIZE);

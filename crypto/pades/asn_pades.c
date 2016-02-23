@@ -73,13 +73,15 @@ int PADES_write_ASN1(BIO *bio, ASN1_VALUE *val, BIO *data, int flags,
 	int ctype_nid, int econt_nid,
 	STACK_OF(X509_ALGOR) *mdalgs, const ASN1_ITEM *it)
 {
-	if ((flags & SMIME_DETACHED) && data) {
+	int ret;
+
+	if ((flags & CMS_DETACHED) && data) {
 
 		// This is a trick to avoid that the data contents (data that has been signed)
-		// be output to the output BIO. The flag PKCS7_NOSMIMECAP, no SMIME capabilities,
+		// be output to the output BIO. The flag CMS_NOSMIMECAP, no SMIME capabilities,
 		// is here used for the implementation of the PADES digital signature, for which
 		// we want the output BIO to receive only the CMS object in B64 format.
-		if (flags & PKCS7_NOSMIMECAP) {
+		if (flags & CMS_NOSMIMECAP) {
 			BIO *tmpout = BIO_new(BIO_s_null());
 			if (!asn1_output_data_frontend(tmpout, data, val, flags, it))
 				return 0;
@@ -91,21 +93,29 @@ int PADES_write_ASN1(BIO *bio, ASN1_VALUE *val, BIO *data, int flags,
 
 		long num1, num2 = bio->num_write;
 
-		B64_write_ASN1_frontend(bio, val, NULL, 0, it);
+		// Check whether the ASN1 encodings should be expressed simply in binary form,
+		// or if they should be expressed in Base 64, and write them into bio accordingly.
+
+		if (flags & CMS_NO_BASE_64) ret = i2d_ASN1_bio_stream(bio, val, data, flags, it);
+		else ret = B64_write_ASN1_frontend(bio, val, data, flags, it);
 		
-		// Flush it wrote to a file.
-		if (!(flags & PKCS7_NOSMIMECAP)) fflush((FILE *)bio->ptr);
+		// If CMS_NOSMIMECAP is not set assume that we are writing to a file and flush it.
+		if (!(flags & CMS_NOSMIMECAP)) fflush((FILE *)bio->ptr);
 
 		num1 = bio->num_write - num2;
-		//printf("O conteudo ASN1 (assinatura) contem %ld bytes (prev = %ld)\n", num1, num2);
 
-		return 1;
+		if (!ret) return 0;
+		else return 1;
 	}
 
-	if (!B64_write_ASN1_frontend(bio, val, data, flags, it))
-		return 0;
+	// Check whether the ASN1 encodings should be expressed simply in binary form,
+	// or if they should be expressed in Base 64, and write them into bio accordingly.
 
-	return 1;
+	if (flags & CMS_NO_BASE_64) ret = i2d_ASN1_bio_stream(bio, val, data, flags, it);
+	else ret = B64_write_ASN1_frontend(bio, val, data, flags, it);
+
+	if (!ret) return 0;
+	else return 1;
 }
 
 /***********************************************************************************************************
@@ -238,12 +248,15 @@ err:
 *   and returns the corresponding ASN1 encoded DN in outbuf.
 */
 
-void Pades_get_ASN1_DN(const char *name, unsigned char **outbuf)
+int Pades_get_ASN1_DN(const char *name, unsigned char **outbuf)
 {
 	X509_NAME  *x509Name = NULL;
+	int len;
 
 	x509Name = Pades_parse_name(name, MBSTRING_ASC, 1);
-	i2d_X509_NAME(x509Name, outbuf);
+	len = i2d_X509_NAME(x509Name, outbuf);
+
+	return(len);
 }
 
 

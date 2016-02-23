@@ -60,6 +60,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <openssl/rc4.h>
+#include <openssl/md5.h>
 #include <openssl/evp.h>
 
 char *usage[] = {
@@ -136,8 +137,8 @@ int main(int argc, char *argv[])
     /* This should set the file to binary mode. */
     {
 # include <fcntl.h>
-        setmode(fileno(in), O_BINARY);
-        setmode(fileno(out), O_BINARY);
+        setmode(_fileno(in), O_BINARY);
+        setmode(_fileno(out), O_BINARY);
     }
 #endif
 

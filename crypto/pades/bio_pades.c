@@ -55,6 +55,42 @@ BIO *read_text_file(const char *filename)
 
 /*
 *
+*  This function reads the contents of a binary file
+*  and places them in a BIO mem buffer, returning a
+*  pointer to the created BIO memory buffer.
+*
+*/
+
+BIO *read_binary_file(const char *filename)
+{
+	int len, byteswritten = 0;
+	char readbuf[MAX_SMLEN];
+
+	// Open file
+	BIO *biofile = BIO_new_file(filename, "r");
+	if (biofile == NULL) {
+		printf("Error opening binary file\n");
+		return(NULL);
+	}
+
+	// Create bio mem buffer
+	BIO *biomembuf = BIO_new(BIO_s_mem());
+
+	// Read file contents into bio memory buffer
+	while ((len = BIO_read(biofile, readbuf, MAX_SMLEN)) > 0) {
+		if (len) {
+			BIO_write(biomembuf, readbuf, len);
+			byteswritten += len;
+		}
+	}
+	//BIO_set_mem_eof_return(biomembuf, 0);
+
+	return(biomembuf);
+}
+
+
+/*
+*
 *  This function reads the contents of a BIO mem buffer
 *  and places them in a text file. It returns 1 in case
 *  of success, and 0 in case of failure.
