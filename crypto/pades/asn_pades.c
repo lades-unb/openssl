@@ -48,7 +48,7 @@ ASN1_VALUE *PADES_read_ASN1(BIO *bio, const ASN1_ITEM *it)
 
 		return val;
 	}
-	else 
+	else
 		if ((bio->method)->type == BIO_TYPE_MEM) {
 			asnin = bio;
 
@@ -98,7 +98,7 @@ int PADES_write_ASN1(BIO *bio, ASN1_VALUE *val, BIO *data, int flags,
 
 		if (flags & CMS_NO_BASE_64) ret = i2d_ASN1_bio_stream(bio, val, data, flags, it);
 		else ret = B64_write_ASN1_frontend(bio, val, data, flags, it);
-		
+
 		// If CMS_NOSMIMECAP is not set assume that we are writing to a file and flush it.
 		if (!(flags & CMS_NOSMIMECAP)) fflush((FILE *)bio->ptr);
 
@@ -120,7 +120,7 @@ int PADES_write_ASN1(BIO *bio, ASN1_VALUE *val, BIO *data, int flags,
 
 /***********************************************************************************************************
 *
-* This function verifies whether a given byte string contained in 
+* This function verifies whether a given byte string contained in
 * the memory buffer "buf" is written in Base 64 format or not.
 *
 * It uses the "Super Light Regular Expression" (slre) code written
@@ -142,7 +142,7 @@ int Pades_ASN1_Data_is_B64(BUF_MEM *buf)   {
 		printf("Error compiling slre: %s\n", slre.err_str);
 		return (B64_ERROR);
 	}
-	
+
 	res = slre_match(&slre, buf->data, buf->length, caps);
 
 	if (res) return (B64_MATCH);
@@ -154,8 +154,8 @@ static BIO * bio_err = NULL;
 
 
 /***
-*   This function takes as input (the cp parameter) a distinguished name in 
-*   ASCII format such as: 
+*   This function takes as input (the cp parameter) a distinguished name in
+*   ASCII format such as:
 *             "/type0=value0/type1=value1/type2=..."
 *   and returns an openssl object of type X509_NAME.
 */
@@ -187,7 +187,7 @@ X509_NAME *Pades_parse_name(const char *cp, long chtype, int canmulti)
 		int ismulti = nextismulti;
 		nextismulti = 0;
 
-		// Collect the type 
+		// Collect the type
 		while (*cp && *cp != '=')
 			*bp++ = *cp++;
 		if (*cp == '\0') {
@@ -219,7 +219,7 @@ X509_NAME *Pades_parse_name(const char *cp, long chtype, int canmulti)
 		if (*cp)
 			++cp;
 
-		// Parse 
+		// Parse
 		nid = OBJ_txt2nid(typestr);
 		if (nid == NID_undef) {
 			BIO_printf(bio_err, "%s: Skipping unknown attribute \"%s\"\n",
