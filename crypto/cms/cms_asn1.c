@@ -126,7 +126,7 @@ ASN1_CHOICE(CMS_RevocationInfoChoice) = {
 ASN1_NDEF_SEQUENCE(CMS_SignedData) = {
         ASN1_SIMPLE(CMS_SignedData, version, LONG),
         ASN1_SET_OF(CMS_SignedData, digestAlgorithms, X509_ALGOR),
-        ASN1_SIMPLE(CMS_SignedData, encapContentInfo, CMS_EncapsulatedContentInfo),
+		ASN1_SIMPLE(CMS_SignedData, encapContentInfo, CMS_EncapsulatedContentInfo),
         ASN1_IMP_SET_OF_OPT(CMS_SignedData, certificates, CMS_CertificateChoices, 0),
         ASN1_IMP_SET_OF_OPT(CMS_SignedData, crls, CMS_RevocationInfoChoice, 1),
         ASN1_SET_OF(CMS_SignedData, signerInfos, CMS_SignerInfo)

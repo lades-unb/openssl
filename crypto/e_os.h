@@ -285,7 +285,12 @@ extern "C" {
         * it's sufficient to check for specific Winsock2 API availability
         * at run-time [DSO_global_lookup is recommended]...
         */
-#    include <winsock2.h>
+
+#ifndef WINSOCK2
+#define WINSOCK2
+#include <winsock2.h>
+#endif
+
 #    include <ws2tcpip.h>
        /* yes, they have to be #included prior to <windows.h> */
 #   endif
@@ -520,7 +525,12 @@ typedef unsigned long clock_t;
 #    endif
 #    if !defined(IPPROTO_IP)
          /* winsock[2].h was included already? */
-#     include <winsock.h>
+
+#ifndef WINSOCK
+#  include <winsock.h>
+#define WINSOCK
+#endif 
+
 #    endif
 #    ifdef getservbyname
 #     undef getservbyname

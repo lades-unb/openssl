@@ -4,7 +4,11 @@
 #ifdef _WIN32
 #include <sys/timeb.h>
 #include <sys/types.h>
+
+#ifndef WINSOCK2
+#define WINSOCK2
 #include <winsock2.h>
+#endif
 
 int gettimeofday(struct timeval* t,void* timezone);
 
@@ -17,7 +21,11 @@ int gettimeofday(struct timeval* t,void* timezone);
 #ifdef _WIN32
 #include <sys/timeb.h>
 #include <sys/types.h>
+
+#ifndef WINSOCK2
+#define WINSOCK2
 #include <winsock2.h>
+#endif
 
 int gettimeofday(struct timeval* t,void* timezone);
 
