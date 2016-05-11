@@ -129,6 +129,7 @@ int PADES_write_ASN1(BIO *bio, ASN1_VALUE *val, BIO *data, int flags,
 ************************************************************************************************************/
 
 int Pades_ASN1_Data_is_B64(BUF_MEM *buf)   {
+	return strstr(buf->data, "-----");
 
 	// Regular expression that represents Base 64 syntax
 	char *b64_regexp = "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)$";
@@ -136,7 +137,6 @@ int Pades_ASN1_Data_is_B64(BUF_MEM *buf)   {
 	struct slre	slre;
 	struct cap	caps[20];
 	int    res = B64_NON_MATCH;
-
 
 	if (!slre_compile(&slre, b64_regexp)) {
 		printf("Error compiling slre: %s\n", slre.err_str);
