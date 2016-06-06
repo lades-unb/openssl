@@ -129,7 +129,7 @@ int PADES_write_ASN1(BIO *bio, ASN1_VALUE *val, BIO *data, int flags,
 ************************************************************************************************************/
 
 int Pades_ASN1_Data_is_B64(BUF_MEM *buf)   {
-	return strstr(buf->data, "-----");
+	return (int)strstr(buf->data, "-----BEGIN");
 
 	// Regular expression that represents Base 64 syntax
 	char *b64_regexp = "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)$";
