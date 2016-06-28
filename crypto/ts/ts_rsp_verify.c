@@ -65,8 +65,6 @@
 
 /* Private function declarations. */
 
-static int TS_verify_cert(X509_STORE *store, STACK_OF(X509) *untrusted,
-                          X509 *signer, STACK_OF(X509) **chain);
 static int TS_check_signing_certs(PKCS7_SIGNER_INFO *si,
                                   STACK_OF(X509) *chain);
 static ESS_SIGNING_CERT *ESS_get_signing_cert(PKCS7_SIGNER_INFO *si);
@@ -246,7 +244,7 @@ int TS_RESP_verify_signature(PKCS7 *token, STACK_OF(X509) *certs,
  * The certificate chain is returned in chain. Caller is responsible for
  * freeing the vector.
  */
-static int TS_verify_cert(X509_STORE *store, STACK_OF(X509) *untrusted,
+int TS_verify_cert(X509_STORE *store, STACK_OF(X509) *untrusted,
                           X509 *signer, STACK_OF(X509) **chain)
 {
     X509_STORE_CTX cert_ctx;

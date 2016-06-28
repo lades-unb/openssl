@@ -612,6 +612,10 @@ TS_RESP *TS_RESP_create_response(TS_RESP_CTX *ctx, BIO *req_bio);
 int TS_RESP_verify_signature(PKCS7 *token, STACK_OF(X509) *certs,
                              X509_STORE *store, X509 **signer_out);
 
+int TS_verify_cert(X509_STORE *store, STACK_OF(X509) *untrusted,
+	X509 *signer, STACK_OF(X509) **chain);
+
+
 /* Context structure for the generic verify method. */
 
 /* Verify the signer's certificate and the signature of the response. */

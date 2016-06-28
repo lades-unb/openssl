@@ -58,6 +58,7 @@
 #include <openssl/x509v3.h>
 #include <openssl/err.h>
 #include <openssl/cms.h>
+#include <openssl/ts.h>
 #include "cms_lcl.h"
 #include "asn1_locl.h"
 
@@ -374,11 +375,22 @@ int CMS_verify(CMS_ContentInfo *cms, STACK_OF(X509) *certs,
 
 		if (!(flags & CMS_NOCRL))
 			crls = CMS_get1_crls(cms);
-		for (i = 0; i < signerInfos_num; i++) {
-			si = sk_CMS_SignerInfo_value(sinfos, i);
-			if (!cms_signerinfo_verify_cert(si, store,
-				cms_certs, crls, flags))
+
+		CMS_SignerInfo_get0_algs(si, NULL, &signer, NULL, NULL);
+		X509_check_purpose(signer, -1, 0);
+
+		if ((signer->ex_xkusage & XKU_TIMESTAMP)) { /* Timestamp */
+			STACK_OF(X509) *chain = sk_X509_new_null();
+			if (!TS_verify_cert(store, cms_certs, signer, &chain))
 				goto err;
+		}
+		else { /* S/MIME */
+			for (i = 0; i < signerInfos_num; i++) {
+				si = sk_CMS_SignerInfo_value(sinfos, i);
+				if (!cms_signerinfo_verify_cert(si, store,
+					cms_certs, crls, flags))
+					goto err;
+			}
 		}
 	}
 
