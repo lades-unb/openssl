@@ -379,12 +379,14 @@ int CMS_verify(CMS_ContentInfo *cms, STACK_OF(X509) *certs,
 		CMS_SignerInfo_get0_algs(si, NULL, &signer, NULL, NULL);
 		X509_check_purpose(signer, -1, 0);
 
-		if ((signer->ex_xkusage & XKU_TIMESTAMP)) { /* Timestamp */
+		if ((signer->ex_xkusage & XKU_TIMESTAMP)) /* Timestamp */
+		{
 			STACK_OF(X509) *chain = sk_X509_new_null();
 			if (!TS_verify_cert(store, cms_certs, signer, &chain))
 				goto err;
 		}
-		else { /* S/MIME */
+		else /* S/MIME */
+		{
 			for (i = 0; i < signerInfos_num; i++) {
 				si = sk_CMS_SignerInfo_value(sinfos, i);
 				if (!cms_signerinfo_verify_cert(si, store,

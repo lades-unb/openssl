@@ -751,9 +751,9 @@ static int check_purpose_timestamp_sign(const X509_PURPOSE *xp, const X509 *x,
      * and/or nonRepudiation (other values are not consistent and shall
      * be rejected).
      */
-    if ((x->ex_flags & EXFLAG_KUSAGE)
-        && ((x->ex_kusage & ~(KU_NON_REPUDIATION | KU_DIGITAL_SIGNATURE)) ||
-            !(x->ex_kusage & (KU_NON_REPUDIATION | KU_DIGITAL_SIGNATURE))))
+    if ((x->ex_flags & EXFLAG_KUSAGE) &&
+        // ((x->ex_kusage & ~(KU_NON_REPUDIATION | KU_DIGITAL_SIGNATURE)) ||
+            !(x->ex_kusage & (KU_NON_REPUDIATION | KU_DIGITAL_SIGNATURE)))
         return 0;
 
     /* Only time stamp key usage is permitted and it's required. */
