@@ -285,8 +285,7 @@ static int cms_signerinfo_verify_cert(CMS_SignerInfo *si,
     i = X509_verify_cert(&ctx);
     if (i <= 0) {
         j = X509_STORE_CTX_get_error(&ctx);
-        CMSerr(CMS_F_CMS_SIGNERINFO_VERIFY_CERT,
-               CMS_R_CERTIFICATE_VERIFY_ERROR);
+        CMSerr(CMS_F_CMS_SIGNERINFO_VERIFY_CERT, j);
         ERR_add_error_data(2, "Verify error:",
                            X509_verify_cert_error_string(j));
         goto err;
@@ -313,7 +312,7 @@ int cms_signerinfo_verify_cert_frontend(CMS_SignerInfo *si,
 int CMS_verify(CMS_ContentInfo *cms, STACK_OF(X509) *certs,
 	X509_STORE *store, BIO *dcont, BIO *out, unsigned int flags)
 {
-	CMS_SignerInfo *si;
+	CMS_SignerInfo *si = NULL;
 	STACK_OF(CMS_SignerInfo) *sinfos;
 	STACK_OF(X509) *cms_certs = NULL;
 	STACK_OF(X509_CRL) *crls = NULL;
