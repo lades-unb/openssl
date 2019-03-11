@@ -133,7 +133,7 @@ static void hashlength(SHA_CTX *sha, size_t l)
     unsigned char b[2];
 
     OPENSSL_assert(l <= 0xffff);
-    b[0] = l >> 8;
+    b[0] = (unsigned char) (l >> 8);
     b[1] = l & 0xff;
     SHA1_Update(sha, b, 2);
 }

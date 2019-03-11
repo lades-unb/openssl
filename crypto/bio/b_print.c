@@ -378,7 +378,7 @@ _dopr(char **sbuffer,
                 if (cflags == DP_C_SHORT) {
                     short int *num;
                     num = va_arg(args, short int *);
-                    *num = currlen;
+                    *num = 0 | (short int) currlen;
                 } else if (cflags == DP_C_LONG) { /* XXX */
                     long int *num;
                     num = va_arg(args, long int *);
