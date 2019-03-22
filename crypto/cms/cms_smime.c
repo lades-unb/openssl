@@ -13,6 +13,7 @@
 #include <openssl/x509v3.h>
 #include <openssl/err.h>
 #include <openssl/cms.h>
+#include <openssl/ts.h>
 #include "cms_lcl.h"
 #include "internal/asn1_int.h"
 
@@ -249,8 +250,7 @@ static int cms_signerinfo_verify_cert(CMS_SignerInfo *si,
     i = X509_verify_cert(ctx);
     if (i <= 0) {
         j = X509_STORE_CTX_get_error(ctx);
-        CMSerr(CMS_F_CMS_SIGNERINFO_VERIFY_CERT,
-               CMS_R_CERTIFICATE_VERIFY_ERROR);
+        CMSerr(CMS_F_CMS_SIGNERINFO_VERIFY_CERT, j);
         ERR_add_error_data(2, "Verify error:",
                            X509_verify_cert_error_string(j));
         goto err;
@@ -265,7 +265,7 @@ static int cms_signerinfo_verify_cert(CMS_SignerInfo *si,
 int CMS_verify(CMS_ContentInfo *cms, STACK_OF(X509) *certs,
                X509_STORE *store, BIO *dcont, BIO *out, unsigned int flags)
 {
-    CMS_SignerInfo *si;
+    CMS_SignerInfo *si = NULL;
     STACK_OF(CMS_SignerInfo) *sinfos;
     STACK_OF(X509) *cms_certs = NULL;
     STACK_OF(X509_CRL) *crls = NULL;
@@ -311,11 +311,23 @@ int CMS_verify(CMS_ContentInfo *cms, STACK_OF(X509) *certs,
         cms_certs = CMS_get1_certs(cms);
         if (!(flags & CMS_NOCRL))
             crls = CMS_get1_crls(cms);
-        for (i = 0; i < sk_CMS_SignerInfo_num(sinfos); i++) {
-            si = sk_CMS_SignerInfo_value(sinfos, i);
-            if (!cms_signerinfo_verify_cert(si, store, cms_certs, crls))
-                goto err;
-        }
+
+		CMS_SignerInfo_get0_algs(si, NULL, &signer, NULL, NULL);
+		int ex_xkusage = X509_get_extended_key_usage(signer);
+		if ((ex_xkusage & XKU_TIMESTAMP)) /* Timestamp */
+		{
+			STACK_OF(X509) *chain = sk_X509_new_null();
+			if (!TS_verify_cert(store, cms_certs, signer, &chain))
+				goto err;
+		}
+		else /* S/MIME */
+		{
+			for (i = 0; i < sk_CMS_SignerInfo_num(sinfos); i++) {
+				si = sk_CMS_SignerInfo_value(sinfos, i);
+				if (!cms_signerinfo_verify_cert(si, store, cms_certs, crls))
+					goto err;
+			}
+		}
     }
 
     /* Attempt to verify all SignerInfo signed attribute signatures */

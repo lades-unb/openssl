@@ -162,6 +162,12 @@ int TS_RESP_verify_signature(PKCS7 *token, STACK_OF(X509) *certs,
  * The certificate chain is returned in chain. Caller is responsible for
  * freeing the vector.
  */
+int TS_verify_cert(X509_STORE *store, STACK_OF(X509) *untrusted,
+                          X509 *signer, STACK_OF(X509) **chain)
+{
+    return ts_verify_cert(store, untrusted, signer, chain);
+}
+
 static int ts_verify_cert(X509_STORE *store, STACK_OF(X509) *untrusted,
                           X509 *signer, STACK_OF(X509) **chain)
 {
